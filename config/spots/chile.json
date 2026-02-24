@@ -1,0 +1,85 @@
+{
+  "pais": "CL",
+  "nombre": "Chile",
+  "regiones": {
+    "valparaiso": {
+      "nombre": "Valparaíso / Viña del Mar",
+      "spots": {
+        "renaca": {
+          "nombre": "Reñaca",
+          "ciudad": "Viña del Mar",
+          "lat": -32.9758,
+          "lon": -71.5385,
+          "orientacion_costa_deg": 270,
+          "tolerancia_swell_deg": 40,
+          "tipo_break": "beach",
+          "fondo": "arena",
+          "marea": {
+            "rango_optimo_min_m": 0.2,
+            "rango_optimo_max_m": 1.2,
+            "tipo_efecto": "low_better",
+            "nota": "Proxy sea_level_height_msl — no es datum náutico"
+          },
+          "swell": {
+            "altura_min_m": 0.8,
+            "altura_max_m": 4.0,
+            "periodo_min_s": 10,
+            "direcciones_ideales": [
+              250,
+              270,
+              290
+            ]
+          },
+          "viento": {
+            "vel_max_offshore_kmh": 35,
+            "vel_max_onshore_kmh": 12
+          },
+          "ajustes_locales": {
+            "delta_altura": 0.0,
+            "factor_periodo": 1.0
+          },
+          "fuente_datos": "open-meteo",
+          "notas": "Costa Pacífico. Swell del NW en invierno, viento terral offshore en mañanas. Período alto = calidad.",
+          "tz": "America/Santiago"
+        },
+        "pichilemu": {
+          "nombre": "Punta de Lobos",
+          "ciudad": "Pichilemu",
+          "lat": -34.4333,
+          "lon": -72.0833,
+          "orientacion_costa_deg": 260,
+          "tolerancia_swell_deg": 30,
+          "tipo_break": "point",
+          "fondo": "roca",
+          "marea": {
+            "rango_optimo_min_m": 0.5,
+            "rango_optimo_max_m": 1.8,
+            "tipo_efecto": "mid_better",
+            "nota": "Proxy sea_level_height_msl — no es datum náutico. Marea baja expone roca."
+          },
+          "swell": {
+            "altura_min_m": 1.5,
+            "altura_max_m": 8.0,
+            "periodo_min_s": 14,
+            "direcciones_ideales": [
+              250,
+              260,
+              280
+            ]
+          },
+          "viento": {
+            "vel_max_offshore_kmh": 40,
+            "vel_max_onshore_kmh": 8
+          },
+          "ajustes_locales": {
+            "delta_altura": 0.0,
+            "factor_periodo": 1.0
+          },
+          "fuente_datos": "open-meteo",
+          "notas": "Point break de clase mundial. Solo funciona con groundswell largo del NW/W. Sede del WSL Big Wave.",
+          "tz": "America/Santiago"
+        }
+      }
+    }
+  }
+}

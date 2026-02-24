@@ -1,0 +1,90 @@
+{
+  "pais": "CR",
+  "nombre": "Costa Rica",
+  "regiones": {
+    "guanacaste": {
+      "nombre": "Guanacaste",
+      "spots": {
+        "tamarindo": {
+          "nombre": "Tamarindo",
+          "ciudad": "Tamarindo",
+          "lat": 10.2993,
+          "lon": -85.843,
+          "orientacion_costa_deg": 270,
+          "tolerancia_swell_deg": 55,
+          "tipo_break": "beach",
+          "fondo": "arena",
+          "marea": {
+            "rango_optimo_min_m": 0.5,
+            "rango_optimo_max_m": 1.8,
+            "tipo_efecto": "mid_better",
+            "nota": "Proxy sea_level_height_msl — no es datum náutico. Rango mareal notable en Pacífico CR."
+          },
+          "swell": {
+            "altura_min_m": 0.6,
+            "altura_max_m": 3.0,
+            "periodo_min_s": 10,
+            "direcciones_ideales": [
+              240,
+              260,
+              280
+            ]
+          },
+          "viento": {
+            "vel_max_offshore_kmh": 20,
+            "vel_max_onshore_kmh": 15
+          },
+          "ajustes_locales": {
+            "delta_altura": 0.0,
+            "factor_periodo": 1.0
+          },
+          "fuente_datos": "open-meteo",
+          "notas": "Hub de surf turístico. Funciona mejor en temporada seca (dic-abr). Viento Papagayo offshore.",
+          "tz": "America/Costa_Rica"
+        }
+      }
+    },
+    "puntarenas": {
+      "nombre": "Puntarenas / Jaco",
+      "spots": {
+        "jaco": {
+          "nombre": "Jacó",
+          "ciudad": "Jacó",
+          "lat": 9.6146,
+          "lon": -84.629,
+          "orientacion_costa_deg": 270,
+          "tolerancia_swell_deg": 60,
+          "tipo_break": "beach",
+          "fondo": "arena",
+          "marea": {
+            "rango_optimo_min_m": 0.5,
+            "rango_optimo_max_m": 2.0,
+            "tipo_efecto": "mid_better",
+            "nota": "Proxy sea_level_height_msl — no es datum náutico"
+          },
+          "swell": {
+            "altura_min_m": 0.5,
+            "altura_max_m": 3.0,
+            "periodo_min_s": 9,
+            "direcciones_ideales": [
+              240,
+              270,
+              300
+            ]
+          },
+          "viento": {
+            "vel_max_offshore_kmh": 20,
+            "vel_max_onshore_kmh": 18
+          },
+          "ajustes_locales": {
+            "delta_altura": 0.0,
+            "factor_periodo": 1.0
+          },
+          "fuente_datos": "open-meteo",
+          "notas": "Más consistente que Guanacaste. Pico central cerca del río. Bueno para principiantes/intermedios.",
+          "tz": "America/Costa_Rica"
+        }
+      }
+    }
+  }
+}

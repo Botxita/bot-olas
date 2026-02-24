@@ -1,0 +1,23 @@
+# Olas Surfer Bot V2 — dependencias
+
+# Telegram
+python-telegram-bot==13.15
+
+# HTTP
+requests==2.32.3
+
+# Config / Env
+python-dotenv==1.0.1
+
+# Web server (webhook en Render)
+Flask==3.0.3
+
+# Timezones
+pytz==2024.1
+
+# Testing
+pytest==8.2.0
+
+# Opcionales (descommentar según necesidad):
+# redis==5.0.6          # Para RedisForecastCache (multi-instancia)
+# psycopg2-binary==2.9.9 # Para PostgreSQL session store (producción avanzada)

@@ -1,0 +1,33 @@
+{
+  "_comment": "Pesos del motor de scoring por tipo de break. Suma de cada fila = 1.0",
+  "pesos_por_break": {
+    "beach": {
+      "energia":    0.28,
+      "periodo":    0.14,
+      "dir_swell":  0.16,
+      "viento":     0.27,
+      "marea":      0.15
+    },
+    "reef": {
+      "energia":    0.24,
+      "periodo":    0.20,
+      "dir_swell":  0.22,
+      "viento":     0.20,
+      "marea":      0.14
+    },
+    "point": {
+      "energia":    0.26,
+      "periodo":    0.18,
+      "dir_swell":  0.24,
+      "viento":     0.20,
+      "marea":      0.12
+    }
+  },
+  "energia": {
+    "escala_normalizacion": 50.0,
+    "_comment": "E = H^2 * T. Este valor mapea energía al rango [0,1]. Ajustar si la escala global parece apagada."
+  },
+  "umbral_ventana_optima": 0.60,
+  "_umbral_comment": "Score mínimo (0-1) para que una hora califique como 'buena ventana'",
+  "top_ventanas": 3
+}

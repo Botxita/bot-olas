@@ -1,0 +1,90 @@
+{
+  "pais": "PE",
+  "nombre": "Perú",
+  "regiones": {
+    "lima": {
+      "nombre": "Lima",
+      "spots": {
+        "miraflores_waikiki": {
+          "nombre": "Waikiki",
+          "ciudad": "Miraflores, Lima",
+          "lat": -12.1328,
+          "lon": -77.0306,
+          "orientacion_costa_deg": 270,
+          "tolerancia_swell_deg": 50,
+          "tipo_break": "beach",
+          "fondo": "arena",
+          "marea": {
+            "rango_optimo_min_m": 0.3,
+            "rango_optimo_max_m": 1.0,
+            "tipo_efecto": "mid_better",
+            "nota": "Proxy sea_level_height_msl — no es datum náutico"
+          },
+          "swell": {
+            "altura_min_m": 0.5,
+            "altura_max_m": 2.5,
+            "periodo_min_s": 10,
+            "direcciones_ideales": [
+              240,
+              270,
+              300
+            ]
+          },
+          "viento": {
+            "vel_max_offshore_kmh": 25,
+            "vel_max_onshore_kmh": 12
+          },
+          "ajustes_locales": {
+            "delta_altura": 0.0,
+            "factor_periodo": 1.0
+          },
+          "fuente_datos": "open-meteo",
+          "notas": "Zona urbana de surf en Lima. Viento sur (offshore) en tardes. Swell austral.",
+          "tz": "America/Lima"
+        }
+      }
+    },
+    "la_libertad": {
+      "nombre": "La Libertad",
+      "spots": {
+        "huanchaco": {
+          "nombre": "Huanchaco",
+          "ciudad": "Trujillo",
+          "lat": -8.0815,
+          "lon": -79.1212,
+          "orientacion_costa_deg": 280,
+          "tolerancia_swell_deg": 40,
+          "tipo_break": "beach",
+          "fondo": "arena",
+          "marea": {
+            "rango_optimo_min_m": 0.3,
+            "rango_optimo_max_m": 1.1,
+            "tipo_efecto": "low_better",
+            "nota": "Proxy sea_level_height_msl — no es datum náutico"
+          },
+          "swell": {
+            "altura_min_m": 0.5,
+            "altura_max_m": 2.5,
+            "periodo_min_s": 10,
+            "direcciones_ideales": [
+              260,
+              280,
+              300
+            ]
+          },
+          "viento": {
+            "vel_max_offshore_kmh": 20,
+            "vel_max_onshore_kmh": 10
+          },
+          "ajustes_locales": {
+            "delta_altura": 0.0,
+            "factor_periodo": 1.0
+          },
+          "fuente_datos": "open-meteo",
+          "notas": "Pueblo ancestral de pescadores en caballitos de totora. Long left.",
+          "tz": "America/Lima"
+        }
+      }
+    }
+  }
+}

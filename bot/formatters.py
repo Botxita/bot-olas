@@ -88,6 +88,7 @@ def formato_condiciones_actuales(
     breakdown: ScoreBreakdown,
     spot: SpotConfig,
     es_pro: bool = True,   # ignorado — todo habilitado
+    tide_analysis=None,    # TideAnalysis opcional para mostrar tendencia de marea
 ) -> str:
     """Mensaje completo de condiciones actuales."""
     lineas = []
@@ -107,7 +108,17 @@ def formato_condiciones_actuales(
     lineas.append(f"💨  Viento:  `{w.velocidad_kmh:.0f} km/h · {_dir_a_texto(w.direccion_deg)}`")
     if w.rafaga_kmh > w.velocidad_kmh * 1.3:
         lineas.append(f"       ↪ Ráfagas: `{w.rafaga_kmh:.0f} km/h`")
-    lineas.append(f"🌊  Marea:   `{t.nivel_m:.2f}m` _(estimada, proxy MSL)_")
+
+    # Marea: tendencia + horarios de alta/baja del día
+    lineas.append(_formato_marea_inline(t, tide_analysis, spot))
+    if tide_analysis is not None and tide_analysis.tiene_extremos_claros and tide_analysis.eventos:
+        tz = _tz(spot)
+        partes = []
+        for ev in tide_analysis.eventos[:4]:
+            hora_ev = ev.timestamp.astimezone(tz).strftime("%H:%M")
+            simbolo = "▲" if ev.tipo == "alta" else "▽"
+            partes.append(f"{simbolo}{hora_ev}")
+        lineas.append(f"       ↪ `{'  '.join(partes)}`")
     lineas.append("")
     lineas.append(SEPARADOR)
 
@@ -120,7 +131,9 @@ def formato_condiciones_actuales(
     for f_neg in breakdown.flags_negativos:
         lineas.append(f"❌ {f_neg}")
     for f_neu in breakdown.flags_neutros:
-        lineas.append(f"ℹ️  {f_neu}")
+        # Omitir el flag técnico de proxy MSL — ya está en el inline de marea
+        if "proxy MSL" not in f_neu and "proxy_msl" not in f_neu.lower():
+            lineas.append(f"ℹ️  {f_neu}")
 
     return "\n".join(lineas)
 
@@ -143,14 +156,16 @@ def formato_ventanas(
         return "\n".join(lineas)
 
     for i, v in enumerate(ventanas, 1):
+        from datetime import timedelta
         hora_ini = _ts_local(v.inicio, spot)
-        hora_fin = _ts_local(v.fin, spot)
+        fin_real = v.fin if v.fin > v.inicio else v.inicio + timedelta(hours=1)
+        hora_fin = _ts_local(fin_real, spot)
         dia = _dia_relativo(v.inicio, spot)
         emoji = _emoji_score(v.score_100)
         lineas.append(f"{emoji} *{dia} {hora_ini}–{hora_fin}*")
         lineas.append(f"   {_estrellas(v.score_promedio)} ({v.score_100}/100)")
-        lineas.append(f"   {v.descripcion}")
-        lineas.append(f"   ⏱ Pico: {_ts_local(v.hora_pico, spot)} hs · {v.horas_count}h de buenas condiciones")
+        lineas.append(f"   {dia} {hora_ini}–{hora_fin}: {v.descripcion}")
+        lineas.append(f"   ⏱ Pico: {_ts_local(v.hora_pico, spot)} hs · {max(v.horas_count, 1)}h de buenas condiciones")
         if i < len(ventanas):
             lineas.append("")
 
@@ -180,22 +195,33 @@ def formato_breakdown_pro(
 
 
 def formato_lista_ventanas_corta(ventanas: List[VentanaOptima], spot: SpotConfig = None) -> str:
-    """Versión compacta de ventanas para incluir al final de condiciones."""
+    """Versión compacta de ventanas para incluir al final de condiciones.
+    Filtra ventanas donde inicio == fin (datos rotos del detector).
+    Si todas son de 1h, toma la mejor y muestra fin = inicio + 1h."""
+    from datetime import timedelta
+
     if not ventanas:
-        return "Sin ventanas buenas en 48h."
-    v = ventanas[0]
+        return "Sin ventanas buenas en las próximas horas."
+
+    # Preferir ventanas con rango real (fin > inicio)
+    con_rango = [v for v in ventanas if v.fin > v.inicio]
+    v = con_rango[0] if con_rango else ventanas[0]
+
     if spot:
-        ini = _ts_local(v.inicio, spot)
-        fin = _ts_local(v.fin, spot)
+        ini_str = _ts_local(v.inicio, spot)
+        fin_real = v.fin if v.fin > v.inicio else v.inicio + timedelta(hours=1)
+        fin_str = _ts_local(fin_real, spot)
         dia = _dia_relativo(v.inicio, spot)
     else:
-        # fallback legacy sin spot
-        ini = v.inicio.strftime("%H:%M")
-        fin = v.fin.strftime("%H:%M")
+        ini_str = v.inicio.strftime("%H:%M")
+        fin_real = v.fin if v.fin > v.inicio else v.inicio + timedelta(hours=1)
+        fin_str = fin_real.strftime("%H:%M")
         dia = "Próxima"
+
+    horas = max(v.horas_count, 1)
     return (
-        f"⏰ Mejor ventana: *{dia} {ini}–{fin}*\n"
-        f"   {v.descripcion}"
+        f"⏰ Mejor ventana: *{dia} {ini_str}–{fin_str}*  _({horas}h)_\n"
+        f"   {dia} {ini_str}–{fin_str}: {v.descripcion}"
     )
 
 
@@ -447,7 +473,15 @@ def formato_dia_completo(
     lineas.append(f"💨  Viento:  `{w.velocidad_kmh:.0f} km/h · {_dir_a_texto(w.direccion_deg)}`")
     if w.rafaga_kmh > w.velocidad_kmh * 1.3:
         lineas.append(f"       ↪ Ráfagas: `{w.rafaga_kmh:.0f} km/h`")
-    lineas.append(f"🌊  Marea:   `{t.nivel_m:.2f}m` _(estimada, proxy MSL)_")
+    lineas.append(_formato_marea_inline(t, tide_analysis, spot))
+    if tide_analysis is not None and tide_analysis.tiene_extremos_claros and tide_analysis.eventos:
+        tz_spot = _tz(spot)
+        partes = []
+        for ev in tide_analysis.eventos[:4]:
+            hora_ev = ev.timestamp.astimezone(tz_spot).strftime("%H:%M")
+            simbolo = "▲" if ev.tipo == "alta" else "▽"
+            partes.append(f"{simbolo}{hora_ev}")
+        lineas.append(f"       ↪ `{'  '.join(partes)}`")
     lineas.append("")
     lineas.append(SEPARADOR)
 
@@ -460,7 +494,8 @@ def formato_dia_completo(
     for f_neg in breakdown.flags_negativos:
         lineas.append(f"❌ {f_neg}")
     for f_neu in breakdown.flags_neutros:
-        lineas.append(f"ℹ️  {f_neu}")
+        if "proxy MSL" not in f_neu and "proxy_msl" not in f_neu.lower():
+            lineas.append(f"ℹ️  {f_neu}")
 
     # Mareas del día
     if tide_analysis:
@@ -478,6 +513,79 @@ def formato_dia_completo(
 # ---------------------------------------------------------------------------
 # Helper interno
 # ---------------------------------------------------------------------------
+
+def _formato_marea_inline(tide_data, tide_analysis, spot: SpotConfig) -> str:
+    """
+    Línea de marea legible para el bloque CONDICIONES.
+
+    Sin tide_analysis: muestra solo tendencia básica.
+    Con tide_analysis: muestra tendencia + próximo evento (alta/baja).
+
+    Ejemplos:
+      🌊  Marea:   subiendo ↑ · próxima alta ~14:30 hs
+      🌊  Marea:   bajando ↓  · próxima baja ~17:00 hs
+      🌊  Marea:   estable →
+    """
+    from core.analysis.tides import TideAnalysis
+
+    flechas = {"subiendo": "↑", "bajando": "↓", "estable": "→"}
+
+    if tide_analysis is None or not isinstance(tide_analysis, TideAnalysis):
+        # Sin análisis — mostrar solo tendencia estimada por el nivel
+        return "🌊  Marea:   _sin datos de tendencia_"
+
+    tendencia = tide_analysis.tendencia_actual
+    flecha = flechas.get(tendencia, "")
+    tz = _tz(spot)
+
+    # Buscar el próximo evento coherente con la tendencia:
+    #   subiendo → próximo evento esperado es ALTA
+    #   bajando  → próximo evento esperado es BAJA
+    #   estable  → cualquier evento próximo
+    proximo = None
+    if tide_analysis.tiene_extremos_claros and tide_analysis.eventos:
+        import datetime as _dt
+        ahora = _dt.datetime.now(_dt.timezone.utc)
+        futuros = [e for e in tide_analysis.eventos if e.timestamp > ahora]
+        if futuros:
+            if tendencia == "subiendo":
+                # buscamos la próxima alta
+                proximo = next((e for e in futuros if e.tipo == "alta"), futuros[0])
+            elif tendencia == "bajando":
+                # buscamos la próxima baja
+                proximo = next((e for e in futuros if e.tipo == "baja"), futuros[0])
+            else:
+                proximo = futuros[0]
+
+    if proximo:
+        hora_evento = proximo.timestamp.astimezone(tz).strftime("%H:%M")
+        tipo = "alta" if proximo.tipo == "alta" else "baja"
+        # Solo mostrar si tiene sentido con la tendencia actual
+        # subiendo → próxima alta | bajando → próxima baja
+        coherente = (
+            (tendencia == "subiendo" and proximo.tipo == "alta") or
+            (tendencia == "bajando" and proximo.tipo == "baja") or
+            tendencia == "estable"
+        )
+        if coherente:
+            return f"🌊  Marea:   `{tendencia} {flecha}` · próxima {tipo} ~{hora_evento} hs"
+        else:
+            # Buscar el siguiente evento coherente
+            if tide_analysis.tiene_extremos_claros and tide_analysis.eventos:
+                from datetime import timezone as _tz_mod
+                ahora = __import__('datetime').datetime.now(_tz_mod.utc)
+                tipo_buscado = "alta" if tendencia == "subiendo" else "baja"
+                coherentes = [e for e in tide_analysis.eventos if e.timestamp > ahora and e.tipo == tipo_buscado]
+                if coherentes:
+                    hora_evento = coherentes[0].timestamp.astimezone(tz).strftime("%H:%M")
+                    return f"🌊  Marea:   `{tendencia} {flecha}` · próxima {tipo_buscado} ~{hora_evento} hs"
+            return f"🌊  Marea:   `{tendencia} {flecha}`"
+    elif tide_analysis.proximo_cambio:
+        hora_cambio = tide_analysis.proximo_cambio.astimezone(tz).strftime("%H:%M")
+        return f"🌊  Marea:   `{tendencia} {flecha}` · cambia ~{hora_cambio} hs"
+    else:
+        return f"🌊  Marea:   `{tendencia} {flecha}`"
+
 
 def _etiqueta(score_100: int) -> str:
     if score_100 >= 85: return "Épico"

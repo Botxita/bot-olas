@@ -1,12 +1,13 @@
 """Detector de ventanas óptimas de surf en las próximas 48 horas.
 
 Algoritmo:
-  1. Calcula score hora por hora usando el motor de scoring
-  2. Identifica horas consecutivas que superan el umbral
-  3. Agrupa en "ventanas" (intervalos contiguos)
-  4. Para cada ventana: score promedio, score máximo, hora pico
-  5. Genera descripción legible en español
-  6. Retorna Top N ventanas ordenadas por score promedio
+  1. Filtra horas nocturnas (fuera del rango amanecer–atardecer del spot)
+  2. Calcula score hora por hora usando el motor de scoring
+  3. Identifica horas consecutivas que superan el umbral
+  4. Agrupa en "ventanas" (intervalos contiguos)
+  5. Para cada ventana: score promedio, score máximo, hora pico
+  6. Genera descripción legible en español
+  7. Retorna Top N ventanas ordenadas por score promedio
 """
 
 import json
@@ -17,6 +18,7 @@ from typing import List
 
 from ..scoring.engine import calcular_score
 from ..scoring.models import ForecastHour, ScoreBreakdown, SpotConfig, VentanaOptima
+from ..analysis.daylight import get_daylight_for_forecast_hour, is_daylight
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +59,24 @@ def detectar_ventanas(
     if not forecast:
         return []
 
-    # Calcular score para cada hora
-    scored: List[tuple] = []  # (ForecastHour, ScoreBreakdown)
+    # Filtrar horas nocturnas: solo evaluar horas dentro del horario diurno
+    forecast_diurno = []
     for hour in forecast:
+        try:
+            daylight = get_daylight_for_forecast_hour(spot, hour.timestamp)
+            if is_daylight(hour.timestamp, daylight):
+                forecast_diurno.append(hour)
+        except Exception as e:
+            logger.warning("Error calculando luz solar para %s: %s", hour.timestamp, e)
+            # En caso de error, incluir la hora (fail-safe)
+            forecast_diurno.append(hour)
+
+    if not forecast_diurno:
+        return []
+
+    # Calcular score para cada hora diurna
+    scored: List[tuple] = []  # (ForecastHour, ScoreBreakdown)
+    for hour in forecast_diurno:
         try:
             breakdown = calcular_score(hour, spot)
             scored.append((hour, breakdown))
@@ -114,7 +131,7 @@ def _construir_ventana(
     hora_pico = horas[idx_pico].timestamp
 
     # Descripción legible
-    desc = _generar_descripcion(horas, group, inicio, fin, hora_pico, score_prom)
+    desc = _generar_descripcion(horas, group, inicio, fin, hora_pico, score_prom, spot)
 
     return VentanaOptima(
         inicio=inicio,
@@ -134,22 +151,28 @@ def _generar_descripcion(
     fin: datetime,
     hora_pico: datetime,
     score_prom: float,
+    spot: SpotConfig,
 ) -> str:
-    """Genera descripción en lenguaje surfer."""
-    now = datetime.now(timezone.utc)
+    """Genera descripción en lenguaje surfer usando la timezone local del spot."""
+    from zoneinfo import ZoneInfo
+    tz = spot.get_zoneinfo()
 
-    # Día relativo
-    delta_dias = (inicio.date() - now.date()).days
+    inicio_local = inicio.astimezone(tz)
+    fin_local = fin.astimezone(tz)
+    now_local = datetime.now(tz)
+
+    # Día relativo en timezone local
+    delta_dias = (inicio_local.date() - now_local.date()).days
     if delta_dias == 0:
         dia = "Hoy"
     elif delta_dias == 1:
         dia = "Mañana"
     else:
         dias_es = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
-        dia = dias_es[inicio.weekday()]
+        dia = dias_es[inicio_local.weekday()]
 
-    hora_inicio_str = inicio.strftime("%H")
-    hora_fin_str = fin.strftime("%H")
+    hora_inicio_str = inicio_local.strftime("%H:%M")
+    hora_fin_str = fin_local.strftime("%H:%M")
 
     # Características predominantes de la ventana (hora pico)
     pico_hour = next((h for h in horas if h.timestamp == hora_pico), horas[0])
@@ -186,7 +209,7 @@ def _generar_descripcion(
         highlights.append("marea no ideal")
 
     highlights_str = " · ".join(highlights)
-    return f"{dia} {hora_inicio_str}–{hora_fin_str}h: {highlights_str}"
+    return highlights_str
 
 
 def calcular_score_actual(

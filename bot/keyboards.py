@@ -32,7 +32,6 @@ PAISES_FLAGS = {
     "uy": "🇺🇾",
 }
 
-
 def kb_seleccion_pais(paises: List[Tuple[str, str]]) -> InlineKeyboardMarkup:
     """Países disponibles, dos por fila."""
     botones = []

@@ -5,76 +5,30 @@
     "buenos_aires": {
       "nombre": "Buenos Aires",
       "spots": {
-        "mdq_varese": {
-          "nombre": "Varese",
+        "mdq_playa_grande": {
+          "nombre": "Playa Grande",
           "ciudad": "Mar del Plata",
-          "lat": -38.0088389,
-          "lon": -57.532875,
-          "orientacion_costa_deg": 95,
-          "tolerancia_swell_deg": 45,
-          "tipo_break": "beach",
-          "fondo": "arena",
-          "marea": {
-            "rango_optimo_min_m": 0.4,
-            "rango_optimo_max_m": 1.6,
-            "tipo_efecto": "mid_better",
-            "nota": "Proxy sea_level_height_msl — no es datum náutico"
-          },
-          "swell": {
-            "altura_min_m": 0.5,
-            "altura_max_m": 3.0,
-            "periodo_min_s": 7,
-            "direcciones_ideales": [
-              90,
-              135,
-              180
-            ]
-          },
-          "viento": {
-            "vel_max_offshore_kmh": 35,
-            "vel_max_onshore_kmh": 15
-          },
-          "ajustes_locales": {
-            "delta_altura": 0.0,
-            "factor_periodo": 1.0
-          },
+          "lat": -38.0325, "lon": -57.5489,
+          "orientacion_costa_deg": 95, "tolerancia_swell_deg": 45,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.4, "rango_optimo_max_m": 1.6, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.5, "altura_max_m": 3.0, "periodo_min_s": 7, "direcciones_ideales": [90, 120, 150]},
+          "viento": {"vel_max_offshore_kmh": 35, "vel_max_onshore_kmh": 15},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
           "fuente_datos": "open-meteo",
-          "notas": "Mejor con swell del E/SE. Bancos de arena cambian entre temporadas.",
+          "notas": "Playa icónica al sur del puerto. Funciona bien con swells del E/SE.",
           "tz": "America/Argentina/Buenos_Aires"
         },
         "mdq_la_perla": {
           "nombre": "La Perla",
           "ciudad": "Mar del Plata",
-          "lat": -37.9942866,
-          "lon": -57.5457393,
-          "orientacion_costa_deg": 90,
-          "tolerancia_swell_deg": 50,
-          "tipo_break": "beach",
-          "fondo": "arena",
-          "marea": {
-            "rango_optimo_min_m": 0.5,
-            "rango_optimo_max_m": 1.8,
-            "tipo_efecto": "mid_better",
-            "nota": "Proxy sea_level_height_msl — no es datum náutico"
-          },
-          "swell": {
-            "altura_min_m": 0.5,
-            "altura_max_m": 2.5,
-            "periodo_min_s": 7,
-            "direcciones_ideales": [
-              90,
-              120,
-              150
-            ]
-          },
-          "viento": {
-            "vel_max_offshore_kmh": 30,
-            "vel_max_onshore_kmh": 15
-          },
-          "ajustes_locales": {
-            "delta_altura": 0.0,
-            "factor_periodo": 1.0
-          },
+          "lat": -37.9942866, "lon": -57.5457393,
+          "orientacion_costa_deg": 90, "tolerancia_swell_deg": 50,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.5, "rango_optimo_max_m": 1.8, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.5, "altura_max_m": 2.5, "periodo_min_s": 7, "direcciones_ideales": [90, 120, 150]},
+          "viento": {"vel_max_offshore_kmh": 30, "vel_max_onshore_kmh": 15},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
           "fuente_datos": "open-meteo",
           "notas": "Buena playa urbana, consistente en swells del E.",
           "tz": "America/Argentina/Buenos_Aires"
@@ -82,110 +36,83 @@
         "mdq_biologia": {
           "nombre": "Biología",
           "ciudad": "Mar del Plata",
-          "lat": -38.0291667,
-          "lon": -57.5325,
-          "orientacion_costa_deg": 100,
-          "tolerancia_swell_deg": 40,
-          "tipo_break": "beach",
-          "fondo": "arena",
-          "marea": {
-            "rango_optimo_min_m": 0.3,
-            "rango_optimo_max_m": 1.4,
-            "tipo_efecto": "low_better",
-            "nota": "Proxy sea_level_height_msl — no es datum náutico"
-          },
-          "swell": {
-            "altura_min_m": 0.6,
-            "altura_max_m": 3.0,
-            "periodo_min_s": 8,
-            "direcciones_ideales": [
-              100,
-              135,
-              160
-            ]
-          },
-          "viento": {
-            "vel_max_offshore_kmh": 35,
-            "vel_max_onshore_kmh": 12
-          },
-          "ajustes_locales": {
-            "delta_altura": 0.0,
-            "factor_periodo": 1.0
-          },
+          "lat": -38.0291667, "lon": -57.5325,
+          "orientacion_costa_deg": 100, "tolerancia_swell_deg": 40,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.4, "tipo_efecto": "low_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.6, "altura_max_m": 3.0, "periodo_min_s": 8, "direcciones_ideales": [100, 135, 160]},
+          "viento": {"vel_max_offshore_kmh": 35, "vel_max_onshore_kmh": 12},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
           "fuente_datos": "open-meteo",
           "notas": "Spot más expuesto al sur. Responde bien a swells del S/SSE.",
+          "tz": "America/Argentina/Buenos_Aires"
+        },
+        "mdq_varese": {
+          "nombre": "Varese",
+          "ciudad": "Mar del Plata",
+          "lat": -38.0088389, "lon": -57.532875,
+          "orientacion_costa_deg": 95, "tolerancia_swell_deg": 45,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.4, "rango_optimo_max_m": 1.6, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.5, "altura_max_m": 3.0, "periodo_min_s": 7, "direcciones_ideales": [90, 135, 180]},
+          "viento": {"vel_max_offshore_kmh": 35, "vel_max_onshore_kmh": 15},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Mejor con swell del E/SE. Bancos de arena cambian entre temporadas.",
+          "tz": "America/Argentina/Buenos_Aires"
+        },
+        "mdq_el_faro": {
+          "nombre": "El Faro",
+          "ciudad": "Mar del Plata",
+          "lat": -38.0520, "lon": -57.5230,
+          "orientacion_costa_deg": 105, "tolerancia_swell_deg": 35,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.4, "tipo_efecto": "low_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.6, "altura_max_m": 3.0, "periodo_min_s": 8, "direcciones_ideales": [100, 130, 160]},
+          "viento": {"vel_max_offshore_kmh": 35, "vel_max_onshore_kmh": 12},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Spot al sur del faro, más encajonado. Bueno con S/SE.",
           "tz": "America/Argentina/Buenos_Aires"
         },
         "mdq_sun_waikiki": {
           "nombre": "Sun Rider / Waikiki",
           "ciudad": "Mar del Plata",
-          "lat": -37.9554,
-          "lon": -57.538,
-          "orientacion_costa_deg": 85,
-          "tolerancia_swell_deg": 55,
-          "tipo_break": "beach",
-          "fondo": "arena",
-          "marea": {
-            "rango_optimo_min_m": 0.5,
-            "rango_optimo_max_m": 2.0,
-            "tipo_efecto": "mid_better",
-            "nota": "Proxy sea_level_height_msl — no es datum náutico"
-          },
-          "swell": {
-            "altura_min_m": 0.5,
-            "altura_max_m": 2.0,
-            "periodo_min_s": 6,
-            "direcciones_ideales": [
-              60,
-              90,
-              120
-            ]
-          },
-          "viento": {
-            "vel_max_offshore_kmh": 30,
-            "vel_max_onshore_kmh": 18
-          },
-          "ajustes_locales": {
-            "delta_altura": 0.0,
-            "factor_periodo": 1.0
-          },
+          "lat": -37.9554, "lon": -57.538,
+          "orientacion_costa_deg": 85, "tolerancia_swell_deg": 55,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.5, "rango_optimo_max_m": 2.0, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.5, "altura_max_m": 2.0, "periodo_min_s": 6, "direcciones_ideales": [60, 90, 120]},
+          "viento": {"vel_max_offshore_kmh": 30, "vel_max_onshore_kmh": 18},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
           "fuente_datos": "open-meteo",
           "notas": "Zona de aprendizaje. Más protegida, tolera onshore moderado.",
+          "tz": "America/Argentina/Buenos_Aires"
+        },
+        "mdq_luna_roja": {
+          "nombre": "Luna Roja",
+          "ciudad": "Mar del Plata",
+          "lat": -38.0160, "lon": -57.5340,
+          "orientacion_costa_deg": 95, "tolerancia_swell_deg": 45,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.4, "rango_optimo_max_m": 1.6, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.5, "altura_max_m": 2.5, "periodo_min_s": 7, "direcciones_ideales": [90, 120, 150]},
+          "viento": {"vel_max_offshore_kmh": 30, "vel_max_onshore_kmh": 15},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Playa semi-urbana al sur de MDP. Buen ambiente, bancos variables.",
           "tz": "America/Argentina/Buenos_Aires"
         },
         "chapa_general": {
           "nombre": "Chapadmalal",
           "ciudad": "Chapadmalal",
-          "lat": -38.03,
-          "lon": -57.72,
-          "orientacion_costa_deg": 100,
-          "tolerancia_swell_deg": 40,
-          "tipo_break": "beach",
-          "fondo": "arena",
-          "marea": {
-            "rango_optimo_min_m": 0.3,
-            "rango_optimo_max_m": 1.5,
-            "tipo_efecto": "low_better",
-            "nota": "Proxy sea_level_height_msl — no es datum náutico"
-          },
-          "swell": {
-            "altura_min_m": 0.6,
-            "altura_max_m": 3.5,
-            "periodo_min_s": 8,
-            "direcciones_ideales": [
-              100,
-              135,
-              160
-            ]
-          },
-          "viento": {
-            "vel_max_offshore_kmh": 35,
-            "vel_max_onshore_kmh": 12
-          },
-          "ajustes_locales": {
-            "delta_altura": 0.0,
-            "factor_periodo": 1.0
-          },
+          "lat": -38.03, "lon": -57.72,
+          "orientacion_costa_deg": 100, "tolerancia_swell_deg": 40,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.5, "tipo_efecto": "low_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.6, "altura_max_m": 3.5, "periodo_min_s": 8, "direcciones_ideales": [100, 135, 160]},
+          "viento": {"vel_max_offshore_kmh": 35, "vel_max_onshore_kmh": 12},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
           "fuente_datos": "open-meteo",
           "notas": "Muy consistente. Mejor con swells del SSE. Zona campeonatos.",
           "tz": "America/Argentina/Buenos_Aires"
@@ -193,36 +120,13 @@
         "miramar_general": {
           "nombre": "Miramar",
           "ciudad": "Miramar",
-          "lat": -38.27044,
-          "lon": -57.8388,
-          "orientacion_costa_deg": 95,
-          "tolerancia_swell_deg": 45,
-          "tipo_break": "beach",
-          "fondo": "arena",
-          "marea": {
-            "rango_optimo_min_m": 0.4,
-            "rango_optimo_max_m": 1.6,
-            "tipo_efecto": "mid_better",
-            "nota": "Proxy sea_level_height_msl — no es datum náutico"
-          },
-          "swell": {
-            "altura_min_m": 0.5,
-            "altura_max_m": 3.0,
-            "periodo_min_s": 7,
-            "direcciones_ideales": [
-              90,
-              135,
-              180
-            ]
-          },
-          "viento": {
-            "vel_max_offshore_kmh": 35,
-            "vel_max_onshore_kmh": 15
-          },
-          "ajustes_locales": {
-            "delta_altura": 0.0,
-            "factor_periodo": 1.0
-          },
+          "lat": -38.27044, "lon": -57.8388,
+          "orientacion_costa_deg": 95, "tolerancia_swell_deg": 45,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.4, "rango_optimo_max_m": 1.6, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.5, "altura_max_m": 3.0, "periodo_min_s": 7, "direcciones_ideales": [90, 135, 180]},
+          "viento": {"vel_max_offshore_kmh": 35, "vel_max_onshore_kmh": 15},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
           "fuente_datos": "open-meteo",
           "notas": "Ciudad tranquila al sur de MDP. Buen ambiente familiar.",
           "tz": "America/Argentina/Buenos_Aires"
@@ -230,36 +134,13 @@
         "quequen_monte_pasubio": {
           "nombre": "Monte Pasubio",
           "ciudad": "Quequén",
-          "lat": -38.57419,
-          "lon": -58.6901,
-          "orientacion_costa_deg": 110,
-          "tolerancia_swell_deg": 35,
-          "tipo_break": "beach",
-          "fondo": "arena",
-          "marea": {
-            "rango_optimo_min_m": 0.3,
-            "rango_optimo_max_m": 1.4,
-            "tipo_efecto": "low_better",
-            "nota": "Proxy sea_level_height_msl — no es datum náutico"
-          },
-          "swell": {
-            "altura_min_m": 0.7,
-            "altura_max_m": 4.0,
-            "periodo_min_s": 9,
-            "direcciones_ideales": [
-              110,
-              135,
-              160
-            ]
-          },
-          "viento": {
-            "vel_max_offshore_kmh": 40,
-            "vel_max_onshore_kmh": 10
-          },
-          "ajustes_locales": {
-            "delta_altura": 0.0,
-            "factor_periodo": 1.0
-          },
+          "lat": -38.57419, "lon": -58.6901,
+          "orientacion_costa_deg": 110, "tolerancia_swell_deg": 35,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.4, "tipo_efecto": "low_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.7, "altura_max_m": 4.0, "periodo_min_s": 9, "direcciones_ideales": [110, 135, 160]},
+          "viento": {"vel_max_offshore_kmh": 40, "vel_max_onshore_kmh": 10},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
           "fuente_datos": "open-meteo",
           "notas": "Spot avanzado. Más expuesto, necesita más período para ser bueno.",
           "tz": "America/Argentina/Buenos_Aires"
@@ -267,36 +148,13 @@
         "necochea_escollera": {
           "nombre": "Escollera",
           "ciudad": "Necochea",
-          "lat": -38.584204,
-          "lon": -58.697162,
-          "orientacion_costa_deg": 115,
-          "tolerancia_swell_deg": 30,
-          "tipo_break": "beach",
-          "fondo": "arena",
-          "marea": {
-            "rango_optimo_min_m": 0.3,
-            "rango_optimo_max_m": 1.3,
-            "tipo_efecto": "low_better",
-            "nota": "Proxy sea_level_height_msl — no es datum náutico"
-          },
-          "swell": {
-            "altura_min_m": 0.8,
-            "altura_max_m": 4.0,
-            "periodo_min_s": 10,
-            "direcciones_ideales": [
-              115,
-              140,
-              165
-            ]
-          },
-          "viento": {
-            "vel_max_offshore_kmh": 40,
-            "vel_max_onshore_kmh": 10
-          },
-          "ajustes_locales": {
-            "delta_altura": 0.0,
-            "factor_periodo": 1.0
-          },
+          "lat": -38.584204, "lon": -58.697162,
+          "orientacion_costa_deg": 115, "tolerancia_swell_deg": 30,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.3, "tipo_efecto": "low_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.8, "altura_max_m": 4.0, "periodo_min_s": 10, "direcciones_ideales": [115, 140, 165]},
+          "viento": {"vel_max_offshore_kmh": 40, "vel_max_onshore_kmh": 10},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
           "fuente_datos": "open-meteo",
           "notas": "Spot de alto rendimiento. Necesita groundswell del S/SSE limpio.",
           "tz": "America/Argentina/Buenos_Aires"

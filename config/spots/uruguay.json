@@ -1,0 +1,100 @@
+{
+  "pais": "UY",
+  "nombre": "Uruguay",
+  "regiones": {
+    "rocha": {
+      "nombre": "Rocha",
+      "spots": {
+        "la_paloma": {
+          "nombre": "La Paloma",
+          "ciudad": "La Paloma",
+          "lat": -34.6540, "lon": -54.1540,
+          "orientacion_costa_deg": 105, "tolerancia_swell_deg": 50,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.4, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.5, "altura_max_m": 3.0, "periodo_min_s": 8, "direcciones_ideales": [100, 130, 160]},
+          "viento": {"vel_max_offshore_kmh": 35, "vel_max_onshore_kmh": 15},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Principal destino surf de Uruguay. Funciona con swells del E/SE. Offshore con viento del O.",
+          "tz": "America/Montevideo"
+        },
+        "la_pedrera": {
+          "nombre": "La Pedrera",
+          "ciudad": "La Pedrera",
+          "lat": -34.5950, "lon": -54.1170,
+          "orientacion_costa_deg": 100, "tolerancia_swell_deg": 45,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.3, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.5, "altura_max_m": 3.0, "periodo_min_s": 8, "direcciones_ideales": [95, 120, 150]},
+          "viento": {"vel_max_offshore_kmh": 35, "vel_max_onshore_kmh": 15},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Pueblo con acantilados. Olas de buena forma con swells limpios del SE.",
+          "tz": "America/Montevideo"
+        },
+        "punta_del_diablo": {
+          "nombre": "Punta del Diablo",
+          "ciudad": "Punta del Diablo",
+          "lat": -33.6630, "lon": -53.4530,
+          "orientacion_costa_deg": 95, "tolerancia_swell_deg": 50,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.4, "rango_optimo_max_m": 1.5, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.5, "altura_max_m": 3.5, "periodo_min_s": 8, "direcciones_ideales": [90, 120, 150]},
+          "viento": {"vel_max_offshore_kmh": 35, "vel_max_onshore_kmh": 15},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Pueblo de pescadores muy pintoresco. Buenas olas con swells del E. Viento del O offshore.",
+          "tz": "America/Montevideo"
+        },
+        "barra_chuy": {
+          "nombre": "Barra del Chuy",
+          "ciudad": "Chuy",
+          "lat": -33.7320, "lon": -53.3800,
+          "orientacion_costa_deg": 90, "tolerancia_swell_deg": 50,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.4, "rango_optimo_max_m": 1.6, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.6, "altura_max_m": 4.0, "periodo_min_s": 9, "direcciones_ideales": [90, 120, 155]},
+          "viento": {"vel_max_offshore_kmh": 40, "vel_max_onshore_kmh": 12},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Frontera con Brasil. Costa muy expuesta. Responde bien a swells grandes del E.",
+          "tz": "America/Montevideo"
+        }
+      }
+    },
+    "maldonado": {
+      "nombre": "Maldonado",
+      "spots": {
+        "el_emir": {
+          "nombre": "El Emir",
+          "ciudad": "Maldonado",
+          "lat": -34.9200, "lon": -54.9100,
+          "orientacion_costa_deg": 145, "tolerancia_swell_deg": 40,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.2, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.5, "altura_max_m": 2.5, "periodo_min_s": 7, "direcciones_ideales": [135, 160, 180]},
+          "viento": {"vel_max_offshore_kmh": 30, "vel_max_onshore_kmh": 15},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Spot clásico de Punta del Este. Bueno con swells del SE.",
+          "tz": "America/Montevideo"
+        },
+        "montoya": {
+          "nombre": "Montoya",
+          "ciudad": "La Barra",
+          "lat": -34.8760, "lon": -54.8520,
+          "orientacion_costa_deg": 135, "tolerancia_swell_deg": 40,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.2, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.5, "altura_max_m": 2.5, "periodo_min_s": 8, "direcciones_ideales": [130, 155, 175]},
+          "viento": {"vel_max_offshore_kmh": 30, "vel_max_onshore_kmh": 15},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Al este de La Barra. Buenas olas tuberas con swells del SE y viento del NO.",
+          "tz": "America/Montevideo"
+        }
+      }
+    }
+  }
+}

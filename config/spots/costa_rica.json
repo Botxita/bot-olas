@@ -8,80 +8,123 @@
         "tamarindo": {
           "nombre": "Tamarindo",
           "ciudad": "Tamarindo",
-          "lat": 10.2993,
-          "lon": -85.843,
-          "orientacion_costa_deg": 270,
-          "tolerancia_swell_deg": 55,
-          "tipo_break": "beach",
-          "fondo": "arena",
-          "marea": {
-            "rango_optimo_min_m": 0.5,
-            "rango_optimo_max_m": 1.8,
-            "tipo_efecto": "mid_better",
-            "nota": "Proxy sea_level_height_msl — no es datum náutico. Rango mareal notable en Pacífico CR."
-          },
-          "swell": {
-            "altura_min_m": 0.6,
-            "altura_max_m": 3.0,
-            "periodo_min_s": 10,
-            "direcciones_ideales": [
-              240,
-              260,
-              280
-            ]
-          },
-          "viento": {
-            "vel_max_offshore_kmh": 20,
-            "vel_max_onshore_kmh": 15
-          },
-          "ajustes_locales": {
-            "delta_altura": 0.0,
-            "factor_periodo": 1.0
-          },
+          "lat": 10.2993, "lon": -85.843,
+          "orientacion_costa_deg": 270, "tolerancia_swell_deg": 55,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.5, "rango_optimo_max_m": 1.8, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico. Rango mareal notable en Pacífico CR."},
+          "swell": {"altura_min_m": 0.6, "altura_max_m": 3.0, "periodo_min_s": 10, "direcciones_ideales": [240, 260, 280]},
+          "viento": {"vel_max_offshore_kmh": 20, "vel_max_onshore_kmh": 15},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
           "fuente_datos": "open-meteo",
-          "notas": "Hub de surf turístico. Funciona mejor en temporada seca (dic-abr). Viento Papagayo offshore.",
+          "notas": "Hub de surf turístico. Mejor en temporada seca (dic-abr). Viento Papagayo offshore en temporada.",
+          "tz": "America/Costa_Rica"
+        },
+        "playa_grande_guanacaste": {
+          "nombre": "Playa Grande",
+          "ciudad": "Tamarindo",
+          "lat": 10.3250, "lon": -85.8560,
+          "orientacion_costa_deg": 270, "tolerancia_swell_deg": 50,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.5, "rango_optimo_max_m": 2.0, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.7, "altura_max_m": 4.0, "periodo_min_s": 11, "direcciones_ideales": [245, 265, 285]},
+          "viento": {"vel_max_offshore_kmh": 25, "vel_max_onshore_kmh": 12},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Mejor y más potente que Tamarindo. Playa reserva de tortugas. Necesita marea para acceder.",
+          "tz": "America/Costa_Rica"
+        },
+        "avellanas": {
+          "nombre": "Avellanas",
+          "ciudad": "Avellanas",
+          "lat": 10.2230, "lon": -85.8170,
+          "orientacion_costa_deg": 270, "tolerancia_swell_deg": 40,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.5, "rango_optimo_max_m": 1.8, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.7, "altura_max_m": 3.5, "periodo_min_s": 10, "direcciones_ideales": [250, 268, 285]},
+          "viento": {"vel_max_offshore_kmh": 22, "vel_max_onshore_kmh": 12},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Spot consistente al sur de Tamarindo. Olas de calidad cuando hay swell del W.",
           "tz": "America/Costa_Rica"
         }
       }
     },
     "puntarenas": {
-      "nombre": "Puntarenas / Jaco",
+      "nombre": "Puntarenas / Jacó",
       "spots": {
+        "santa_teresa": {
+          "nombre": "Santa Teresa",
+          "ciudad": "Santa Teresa",
+          "lat": 9.6450, "lon": -85.1720,
+          "orientacion_costa_deg": 270, "tolerancia_swell_deg": 50,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.5, "rango_optimo_max_m": 2.0, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.8, "altura_max_m": 4.0, "periodo_min_s": 11, "direcciones_ideales": [250, 270, 290]},
+          "viento": {"vel_max_offshore_kmh": 25, "vel_max_onshore_kmh": 15},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Destino de surf de clase mundial. Olas constantes todo el año. Mejor con swells del W/SW 11s+.",
+          "tz": "America/Costa_Rica"
+        },
         "jaco": {
           "nombre": "Jacó",
           "ciudad": "Jacó",
-          "lat": 9.6146,
-          "lon": -84.629,
-          "orientacion_costa_deg": 270,
-          "tolerancia_swell_deg": 60,
-          "tipo_break": "beach",
-          "fondo": "arena",
-          "marea": {
-            "rango_optimo_min_m": 0.5,
-            "rango_optimo_max_m": 2.0,
-            "tipo_efecto": "mid_better",
-            "nota": "Proxy sea_level_height_msl — no es datum náutico"
-          },
-          "swell": {
-            "altura_min_m": 0.5,
-            "altura_max_m": 3.0,
-            "periodo_min_s": 9,
-            "direcciones_ideales": [
-              240,
-              270,
-              300
-            ]
-          },
-          "viento": {
-            "vel_max_offshore_kmh": 20,
-            "vel_max_onshore_kmh": 18
-          },
-          "ajustes_locales": {
-            "delta_altura": 0.0,
-            "factor_periodo": 1.0
-          },
+          "lat": 9.6146, "lon": -84.629,
+          "orientacion_costa_deg": 270, "tolerancia_swell_deg": 60,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.5, "rango_optimo_max_m": 2.0, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.5, "altura_max_m": 3.0, "periodo_min_s": 9, "direcciones_ideales": [240, 270, 300]},
+          "viento": {"vel_max_offshore_kmh": 20, "vel_max_onshore_kmh": 18},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
           "fuente_datos": "open-meteo",
           "notas": "Más consistente que Guanacaste. Pico central cerca del río. Bueno para principiantes/intermedios.",
+          "tz": "America/Costa_Rica"
+        },
+        "playa_hermosa_jaco": {
+          "nombre": "Playa Hermosa",
+          "ciudad": "Jacó",
+          "lat": 9.5640, "lon": -84.6240,
+          "orientacion_costa_deg": 265, "tolerancia_swell_deg": 40,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.5, "rango_optimo_max_m": 2.0, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.8, "altura_max_m": 4.0, "periodo_min_s": 10, "direcciones_ideales": [245, 265, 285]},
+          "viento": {"vel_max_offshore_kmh": 22, "vel_max_onshore_kmh": 12},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "A pocos km al sur de Jacó. Olas más limpias y potentes que en Jacó. Sede de competencias.",
+          "tz": "America/Costa_Rica"
+        },
+        "pavones": {
+          "nombre": "Pavones",
+          "ciudad": "Pavones",
+          "lat": 8.4350, "lon": -83.1400,
+          "orientacion_costa_deg": 270, "tolerancia_swell_deg": 30,
+          "tipo_break": "point", "fondo": "roca",
+          "marea": {"rango_optimo_min_m": 0.5, "rango_optimo_max_m": 2.0, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 1.0, "altura_max_m": 5.0, "periodo_min_s": 13, "direcciones_ideales": [255, 270, 285]},
+          "viento": {"vel_max_offshore_kmh": 25, "vel_max_onshore_kmh": 10},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Segunda izquierda más larga del mundo. Solo funciona con swell grande del SW. Remoto pero épico.",
+          "tz": "America/Costa_Rica"
+        }
+      }
+    },
+    "limon": {
+      "nombre": "Limón (Caribe)",
+      "spots": {
+        "salsa_brava": {
+          "nombre": "Salsa Brava",
+          "ciudad": "Puerto Viejo",
+          "lat": 9.6560, "lon": -82.7160,
+          "orientacion_costa_deg": 50, "tolerancia_swell_deg": 30,
+          "tipo_break": "reef", "fondo": "coral",
+          "marea": {"rango_optimo_min_m": 0.2, "rango_optimo_max_m": 0.8, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 1.2, "altura_max_m": 5.0, "periodo_min_s": 10, "direcciones_ideales": [40, 60, 75]},
+          "viento": {"vel_max_offshore_kmh": 25, "vel_max_onshore_kmh": 8},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Arrecife de coral. Derecha tubera muy potente en el Caribe. Swell del NE dic-mar. Sólo expertos — arrecife superficial.",
           "tz": "America/Costa_Rica"
         }
       }

@@ -2,81 +2,115 @@
   "pais": "CL",
   "nombre": "Chile",
   "regiones": {
+    "arica_parinacota": {
+      "nombre": "Arica",
+      "spots": {
+        "el_gringo": {
+          "nombre": "El Gringo",
+          "ciudad": "Arica",
+          "lat": -18.4750, "lon": -70.3380,
+          "orientacion_costa_deg": 255, "tolerancia_swell_deg": 30,
+          "tipo_break": "point", "fondo": "roca",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.2, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 1.5, "altura_max_m": 6.0, "periodo_min_s": 15, "direcciones_ideales": [240, 255, 270]},
+          "viento": {"vel_max_offshore_kmh": 35, "vel_max_onshore_kmh": 8},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.1},
+          "fuente_datos": "open-meteo",
+          "notas": "Point izquierdo legendario. Swell W-SW 15s+ obligatorio. Offshore matutino del SE. Spot de élite.",
+          "tz": "America/Santiago"
+        },
+        "las_machas": {
+          "nombre": "Las Machas",
+          "ciudad": "Arica",
+          "lat": -18.4870, "lon": -70.3410,
+          "orientacion_costa_deg": 265, "tolerancia_swell_deg": 40,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.2, "rango_optimo_max_m": 1.0, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.8, "altura_max_m": 3.5, "periodo_min_s": 12, "direcciones_ideales": [250, 265, 280]},
+          "viento": {"vel_max_offshore_kmh": 30, "vel_max_onshore_kmh": 10},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Playa de Arica con olas consistentes. Más accesible que El Gringo.",
+          "tz": "America/Santiago"
+        }
+      }
+    },
     "valparaiso": {
       "nombre": "Valparaíso / Viña del Mar",
       "spots": {
+        "ritoque": {
+          "nombre": "Ritoque",
+          "ciudad": "Quintero",
+          "lat": -32.8670, "lon": -71.5130,
+          "orientacion_costa_deg": 265, "tolerancia_swell_deg": 45,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.2, "rango_optimo_max_m": 1.2, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.8, "altura_max_m": 4.0, "periodo_min_s": 10, "direcciones_ideales": [245, 265, 285]},
+          "viento": {"vel_max_offshore_kmh": 35, "vel_max_onshore_kmh": 12},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Playa larga al norte de Viña. Olas consistentes con swells del W/SW. Offshore matutino.",
+          "tz": "America/Santiago"
+        },
         "renaca": {
           "nombre": "Reñaca",
           "ciudad": "Viña del Mar",
-          "lat": -32.9758,
-          "lon": -71.5385,
-          "orientacion_costa_deg": 270,
-          "tolerancia_swell_deg": 40,
-          "tipo_break": "beach",
-          "fondo": "arena",
-          "marea": {
-            "rango_optimo_min_m": 0.2,
-            "rango_optimo_max_m": 1.2,
-            "tipo_efecto": "low_better",
-            "nota": "Proxy sea_level_height_msl — no es datum náutico"
-          },
-          "swell": {
-            "altura_min_m": 0.8,
-            "altura_max_m": 4.0,
-            "periodo_min_s": 10,
-            "direcciones_ideales": [
-              250,
-              270,
-              290
-            ]
-          },
-          "viento": {
-            "vel_max_offshore_kmh": 35,
-            "vel_max_onshore_kmh": 12
-          },
-          "ajustes_locales": {
-            "delta_altura": 0.0,
-            "factor_periodo": 1.0
-          },
+          "lat": -32.9758, "lon": -71.5385,
+          "orientacion_costa_deg": 270, "tolerancia_swell_deg": 40,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.2, "rango_optimo_max_m": 1.2, "tipo_efecto": "low_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.8, "altura_max_m": 4.0, "periodo_min_s": 10, "direcciones_ideales": [250, 270, 290]},
+          "viento": {"vel_max_offshore_kmh": 35, "vel_max_onshore_kmh": 12},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
           "fuente_datos": "open-meteo",
           "notas": "Costa Pacífico. Swell del NW en invierno, viento terral offshore en mañanas. Período alto = calidad.",
           "tz": "America/Santiago"
-        },
-        "pichilemu": {
+        }
+      }
+    },
+    "ohiggins": {
+      "nombre": "O'Higgins (Pichilemu)",
+      "spots": {
+        "punta_de_lobos": {
           "nombre": "Punta de Lobos",
           "ciudad": "Pichilemu",
-          "lat": -34.4333,
-          "lon": -72.0833,
-          "orientacion_costa_deg": 260,
-          "tolerancia_swell_deg": 30,
-          "tipo_break": "point",
-          "fondo": "roca",
-          "marea": {
-            "rango_optimo_min_m": 0.5,
-            "rango_optimo_max_m": 1.8,
-            "tipo_efecto": "mid_better",
-            "nota": "Proxy sea_level_height_msl — no es datum náutico. Marea baja expone roca."
-          },
-          "swell": {
-            "altura_min_m": 1.5,
-            "altura_max_m": 8.0,
-            "periodo_min_s": 14,
-            "direcciones_ideales": [
-              250,
-              260,
-              280
-            ]
-          },
-          "viento": {
-            "vel_max_offshore_kmh": 40,
-            "vel_max_onshore_kmh": 8
-          },
-          "ajustes_locales": {
-            "delta_altura": 0.0,
-            "factor_periodo": 1.0
-          },
+          "lat": -34.4333, "lon": -72.0833,
+          "orientacion_costa_deg": 260, "tolerancia_swell_deg": 30,
+          "tipo_break": "point", "fondo": "roca",
+          "marea": {"rango_optimo_min_m": 0.5, "rango_optimo_max_m": 1.8, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico. Marea baja expone roca."},
+          "swell": {"altura_min_m": 1.5, "altura_max_m": 8.0, "periodo_min_s": 14, "direcciones_ideales": [250, 260, 280]},
+          "viento": {"vel_max_offshore_kmh": 40, "vel_max_onshore_kmh": 8},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.1},
           "fuente_datos": "open-meteo",
-          "notas": "Point break de clase mundial. Solo funciona con groundswell largo del NW/W. Sede del WSL Big Wave.",
+          "notas": "Point break de clase mundial. Solo funciona con groundswell W/SW 14s+. Viento E offshore AM. Sede del WSL Big Wave.",
+          "tz": "America/Santiago"
+        },
+        "pichilemu_infiernillo": {
+          "nombre": "Pichilemu / Infiernillo",
+          "ciudad": "Pichilemu",
+          "lat": -34.3870, "lon": -72.0090,
+          "orientacion_costa_deg": 265, "tolerancia_swell_deg": 40,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.5, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.8, "altura_max_m": 4.0, "periodo_min_s": 10, "direcciones_ideales": [250, 265, 280]},
+          "viento": {"vel_max_offshore_kmh": 35, "vel_max_onshore_kmh": 12},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Playa principal de Pichilemu. Más accesible que Punta de Lobos. Buenas olas para intermedios/avanzados.",
+          "tz": "America/Santiago"
+        },
+        "la_boca_matanzas": {
+          "nombre": "La Boca (Matanzas)",
+          "ciudad": "Matanzas",
+          "lat": -33.9610, "lon": -71.8710,
+          "orientacion_costa_deg": 260, "tolerancia_swell_deg": 35,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.4, "tipo_efecto": "low_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.8, "altura_max_m": 4.0, "periodo_min_s": 11, "direcciones_ideales": [245, 260, 280]},
+          "viento": {"vel_max_offshore_kmh": 35, "vel_max_onshore_kmh": 10},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Conocido como 'La Punta del Este de Chile'. Banco de arena en la boca del río. Muy ventoso pero olas potentes.",
           "tz": "America/Santiago"
         }
       }

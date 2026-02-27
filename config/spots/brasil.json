@@ -5,76 +5,142 @@
     "santa_catarina": {
       "nombre": "Santa Catarina",
       "spots": {
+        "praia_do_rosa": {
+          "nombre": "Praia do Rosa",
+          "ciudad": "Imbituba",
+          "lat": -28.1300, "lon": -48.6600,
+          "orientacion_costa_deg": 120, "tolerancia_swell_deg": 40,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.2, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.8, "altura_max_m": 4.0, "periodo_min_s": 10, "direcciones_ideales": [120, 150, 170]},
+          "viento": {"vel_max_offshore_kmh": 30, "vel_max_onshore_kmh": 12},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Reconocida como una de las mejores playas de Brasil. Funciona con swells del S/SE y viento N offshore.",
+          "tz": "America/Sao_Paulo"
+        },
+        "ferrugem": {
+          "nombre": "Ferrugem",
+          "ciudad": "Garopaba",
+          "lat": -28.0700, "lon": -48.6200,
+          "orientacion_costa_deg": 115, "tolerancia_swell_deg": 40,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.1, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.7, "altura_max_m": 3.5, "periodo_min_s": 9, "direcciones_ideales": [110, 140, 165]},
+          "viento": {"vel_max_offshore_kmh": 28, "vel_max_onshore_kmh": 12},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Clásico de Garopaba. Gran ambiente surfer, buenos bancos cuando hay swell del S.",
+          "tz": "America/Sao_Paulo"
+        },
+        "barra_ibiraquera": {
+          "nombre": "Barra de Ibiraquera",
+          "ciudad": "Imbituba",
+          "lat": -28.1000, "lon": -48.6400,
+          "orientacion_costa_deg": 110, "tolerancia_swell_deg": 45,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.2, "rango_optimo_max_m": 1.0, "tipo_efecto": "low_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.6, "altura_max_m": 3.0, "periodo_min_s": 8, "direcciones_ideales": [110, 140, 160]},
+          "viento": {"vel_max_offshore_kmh": 25, "vel_max_onshore_kmh": 12},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Barra formada por la laguna. Buenas olas cuando entra swell limpio.",
+          "tz": "America/Sao_Paulo"
+        },
+        "imbituba_porto": {
+          "nombre": "Praia do Porto",
+          "ciudad": "Imbituba",
+          "lat": -28.2350, "lon": -48.6650,
+          "orientacion_costa_deg": 100, "tolerancia_swell_deg": 40,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.2, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.6, "altura_max_m": 3.0, "periodo_min_s": 8, "direcciones_ideales": [100, 130, 160]},
+          "viento": {"vel_max_offshore_kmh": 28, "vel_max_onshore_kmh": 12},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Spot consistent, protegido por el puerto al norte.",
+          "tz": "America/Sao_Paulo"
+        },
+        "garopaba_central": {
+          "nombre": "Garopaba",
+          "ciudad": "Garopaba",
+          "lat": -28.0270, "lon": -48.6180,
+          "orientacion_costa_deg": 110, "tolerancia_swell_deg": 50,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.2, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.5, "altura_max_m": 3.0, "periodo_min_s": 8, "direcciones_ideales": [110, 140, 165]},
+          "viento": {"vel_max_offshore_kmh": 28, "vel_max_onshore_kmh": 15},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Playa principal de Garopaba. Buena para todos los niveles.",
+          "tz": "America/Sao_Paulo"
+        },
+        "silveira": {
+          "nombre": "Silveira",
+          "ciudad": "Garopaba",
+          "lat": -28.0950, "lon": -48.6350,
+          "orientacion_costa_deg": 120, "tolerancia_swell_deg": 35,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.2, "rango_optimo_max_m": 1.0, "tipo_efecto": "low_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.8, "altura_max_m": 4.0, "periodo_min_s": 10, "direcciones_ideales": [120, 150, 170]},
+          "viento": {"vel_max_offshore_kmh": 30, "vel_max_onshore_kmh": 10},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Playa salvaje entre Rosa y Ferrugem. Excelente calidad cuando hay swell grande.",
+          "tz": "America/Sao_Paulo"
+        },
         "floripa_joaquina": {
           "nombre": "Joaquina",
           "ciudad": "Florianópolis",
-          "lat": -27.6428,
-          "lon": -48.4736,
-          "orientacion_costa_deg": 110,
-          "tolerancia_swell_deg": 40,
-          "tipo_break": "beach",
-          "fondo": "arena",
-          "marea": {
-            "rango_optimo_min_m": 0.3,
-            "rango_optimo_max_m": 1.2,
-            "tipo_efecto": "mid_better",
-            "nota": "Proxy sea_level_height_msl — no es datum náutico"
-          },
-          "swell": {
-            "altura_min_m": 0.6,
-            "altura_max_m": 3.5,
-            "periodo_min_s": 8,
-            "direcciones_ideales": [
-              110,
-              135,
-              160
-            ]
-          },
-          "viento": {
-            "vel_max_offshore_kmh": 30,
-            "vel_max_onshore_kmh": 15
-          },
-          "ajustes_locales": {
-            "delta_altura": 0.0,
-            "factor_periodo": 1.0
-          },
+          "lat": -27.6428, "lon": -48.4736,
+          "orientacion_costa_deg": 110, "tolerancia_swell_deg": 40,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.2, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.6, "altura_max_m": 3.5, "periodo_min_s": 8, "direcciones_ideales": [110, 135, 160]},
+          "viento": {"vel_max_offshore_kmh": 30, "vel_max_onshore_kmh": 15},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
           "fuente_datos": "open-meteo",
           "notas": "Clásico de Floripa. Funciona bien con swells del S/SE y viento norte (offshore).",
+          "tz": "America/Sao_Paulo"
+        },
+        "floripa_praia_mole": {
+          "nombre": "Praia Mole",
+          "ciudad": "Florianópolis",
+          "lat": -27.6050, "lon": -48.4530,
+          "orientacion_costa_deg": 100, "tolerancia_swell_deg": 45,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.2, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.5, "altura_max_m": 3.0, "periodo_min_s": 7, "direcciones_ideales": [100, 130, 160]},
+          "viento": {"vel_max_offshore_kmh": 28, "vel_max_onshore_kmh": 15},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Surf y ambiente animado. Buen banco de arena central.",
+          "tz": "America/Sao_Paulo"
+        },
+        "floripa_campeche": {
+          "nombre": "Campeche",
+          "ciudad": "Florianópolis",
+          "lat": -27.6875, "lon": -48.4900,
+          "orientacion_costa_deg": 115, "tolerancia_swell_deg": 40,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.1, "tipo_efecto": "low_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.7, "altura_max_m": 3.5, "periodo_min_s": 9, "direcciones_ideales": [110, 140, 165]},
+          "viento": {"vel_max_offshore_kmh": 30, "vel_max_onshore_kmh": 12},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Más expuesto que Mole, olas de mejor calidad con swells grandes.",
           "tz": "America/Sao_Paulo"
         },
         "floripa_barra": {
           "nombre": "Barra da Lagoa",
           "ciudad": "Florianópolis",
-          "lat": -27.57,
-          "lon": -48.42,
-          "orientacion_costa_deg": 95,
-          "tolerancia_swell_deg": 45,
-          "tipo_break": "beach",
-          "fondo": "arena",
-          "marea": {
-            "rango_optimo_min_m": 0.2,
-            "rango_optimo_max_m": 1.0,
-            "tipo_efecto": "mid_better",
-            "nota": "Proxy sea_level_height_msl — no es datum náutico"
-          },
-          "swell": {
-            "altura_min_m": 0.5,
-            "altura_max_m": 3.0,
-            "periodo_min_s": 7,
-            "direcciones_ideales": [
-              90,
-              120,
-              150
-            ]
-          },
-          "viento": {
-            "vel_max_offshore_kmh": 25,
-            "vel_max_onshore_kmh": 12
-          },
-          "ajustes_locales": {
-            "delta_altura": 0.0,
-            "factor_periodo": 1.0
-          },
+          "lat": -27.57, "lon": -48.42,
+          "orientacion_costa_deg": 95, "tolerancia_swell_deg": 45,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.2, "rango_optimo_max_m": 1.0, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.5, "altura_max_m": 3.0, "periodo_min_s": 7, "direcciones_ideales": [90, 120, 150]},
+          "viento": {"vel_max_offshore_kmh": 25, "vel_max_onshore_kmh": 12},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
           "fuente_datos": "open-meteo",
           "notas": "Spot consistente, buen banco de arena central.",
           "tz": "America/Sao_Paulo"
@@ -84,42 +150,80 @@
     "sao_paulo": {
       "nombre": "São Paulo",
       "spots": {
+        "itamambuca": {
+          "nombre": "Itamambuca",
+          "ciudad": "Ubatuba",
+          "lat": -23.3340, "lon": -44.8820,
+          "orientacion_costa_deg": 160, "tolerancia_swell_deg": 35,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.0, "tipo_efecto": "low_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.7, "altura_max_m": 3.0, "periodo_min_s": 9, "direcciones_ideales": [150, 175, 200]},
+          "viento": {"vel_max_offshore_kmh": 25, "vel_max_onshore_kmh": 12},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Mejor spot de Ubatuba. Olas de calidad cuando entra swell austral. Gran banco de areia.",
+          "tz": "America/Sao_Paulo"
+        },
         "maresia": {
           "nombre": "Maresia",
           "ciudad": "São Sebastião",
-          "lat": -23.776,
-          "lon": -45.558,
-          "orientacion_costa_deg": 160,
-          "tolerancia_swell_deg": 35,
-          "tipo_break": "beach",
-          "fondo": "arena",
-          "marea": {
-            "rango_optimo_min_m": 0.3,
-            "rango_optimo_max_m": 1.1,
-            "tipo_efecto": "low_better",
-            "nota": "Proxy sea_level_height_msl — no es datum náutico"
-          },
-          "swell": {
-            "altura_min_m": 0.6,
-            "altura_max_m": 2.5,
-            "periodo_min_s": 8,
-            "direcciones_ideales": [
-              160,
-              180,
-              200
-            ]
-          },
-          "viento": {
-            "vel_max_offshore_kmh": 25,
-            "vel_max_onshore_kmh": 12
-          },
-          "ajustes_locales": {
-            "delta_altura": 0.0,
-            "factor_periodo": 1.0
-          },
+          "lat": -23.776, "lon": -45.558,
+          "orientacion_costa_deg": 160, "tolerancia_swell_deg": 35,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.1, "tipo_efecto": "low_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.6, "altura_max_m": 2.5, "periodo_min_s": 8, "direcciones_ideales": [160, 180, 200]},
+          "viento": {"vel_max_offshore_kmh": 25, "vel_max_onshore_kmh": 12},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
           "fuente_datos": "open-meteo",
           "notas": "Surf clásico del litoral norte de SP. Buen tubo cuando el swell es grande.",
           "tz": "America/Sao_Paulo"
+        }
+      }
+    },
+    "rio_grande_do_norte": {
+      "nombre": "Rio Grande do Norte",
+      "spots": {
+        "pipa": {
+          "nombre": "Pipa",
+          "ciudad": "Tibau do Sul",
+          "lat": -6.2280, "lon": -35.0490,
+          "orientacion_costa_deg": 20, "tolerancia_swell_deg": 50,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.5, "rango_optimo_max_m": 2.0, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.6, "altura_max_m": 2.5, "periodo_min_s": 8, "direcciones_ideales": [20, 45, 60]},
+          "viento": {"vel_max_offshore_kmh": 25, "vel_max_onshore_kmh": 15},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Swell del NE. Offshore en mañanas cuando el viento terral sopla del interior. Gran ambiente.",
+          "tz": "America/Fortaleza"
+        },
+        "praia_madeiro": {
+          "nombre": "Praia do Madeiro",
+          "ciudad": "Tibau do Sul",
+          "lat": -6.2140, "lon": -35.0430,
+          "orientacion_costa_deg": 15, "tolerancia_swell_deg": 45,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.4, "rango_optimo_max_m": 1.8, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.5, "altura_max_m": 2.0, "periodo_min_s": 7, "direcciones_ideales": [15, 40, 60]},
+          "viento": {"vel_max_offshore_kmh": 22, "vel_max_onshore_kmh": 15},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Playa más tranquila al norte de Pipa. Buena para surf tranquilo.",
+          "tz": "America/Fortaleza"
+        },
+        "baia_formosa": {
+          "nombre": "Baía Formosa",
+          "ciudad": "Baía Formosa",
+          "lat": -6.3680, "lon": -35.0050,
+          "orientacion_costa_deg": 55, "tolerancia_swell_deg": 40,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.4, "rango_optimo_max_m": 1.8, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.6, "altura_max_m": 2.5, "periodo_min_s": 8, "direcciones_ideales": [40, 60, 80]},
+          "viento": {"vel_max_offshore_kmh": 25, "vel_max_onshore_kmh": 15},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Playa larga y poco frecuentada. Olas consistentes con swell del E.",
+          "tz": "America/Fortaleza"
         }
       }
     }

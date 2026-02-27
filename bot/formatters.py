@@ -164,7 +164,7 @@ def formato_ventanas(
         emoji = _emoji_score(v.score_100)
         lineas.append(f"{emoji} *{dia} {hora_ini}–{hora_fin}*")
         lineas.append(f"   {_estrellas(v.score_promedio)} ({v.score_100}/100)")
-        lineas.append(f"   {dia} {hora_ini}–{hora_fin}: {v.descripcion}")
+        lineas.append(f"   📝 {v.descripcion}")
         lineas.append(f"   ⏱ Pico: {_ts_local(v.hora_pico, spot)} hs · {max(v.horas_count, 1)}h de buenas condiciones")
         if i < len(ventanas):
             lineas.append("")
@@ -221,7 +221,7 @@ def formato_lista_ventanas_corta(ventanas: List[VentanaOptima], spot: SpotConfig
     horas = max(v.horas_count, 1)
     return (
         f"⏰ Mejor ventana: *{dia} {ini_str}–{fin_str}*  _({horas}h)_\n"
-        f"   {dia} {ini_str}–{fin_str}: {v.descripcion}"
+        f"   📝 {v.descripcion}"
     )
 
 

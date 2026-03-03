@@ -21,6 +21,8 @@ Variables opcionales:
 import logging
 import os
 import sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from threading import Thread
 
 from dotenv import load_dotenv
 from telegram.ext import Updater
@@ -39,6 +41,30 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 
+class HealthHandler(BaseHTTPRequestHandler):
+    """Servidor HTTP mínimo que responde 200 OK en /health."""
+
+    def do_GET(self):
+        if self.path == "/health":
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"OK")
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def log_message(self, format, *args):
+        pass  # Silenciar logs de acceso HTTP
+
+
+def _start_health_server(port: int):
+    """Arranca el servidor de health en un thread separado."""
+    server = HTTPServer(("0.0.0.0", port), HealthHandler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    logger.info("Health server escuchando en :%d/health", port)
+
+
 def main():
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
@@ -55,6 +81,10 @@ def main():
 
     if use_webhook:
         logger.info("Iniciando en modo WEBHOOK → %s (port %d)", webhook_url, port)
+
+        # Health endpoint en puerto 8080 para UptimeRobot
+        _start_health_server(8080)
+
         updater.start_webhook(
             listen="0.0.0.0",
             port=port,

@@ -29,8 +29,8 @@ PAISES_FLAGS = {
     "cl": "🇨🇱",
     "pe": "🇵🇪",
     "cr": "🇨🇷",
-    "uy": "🇺🇾",
 }
+
 
 def kb_seleccion_pais(paises: List[Tuple[str, str]]) -> InlineKeyboardMarkup:
     """Países disponibles, dos por fila."""
@@ -98,6 +98,8 @@ def kb_menu_spot(
     spot_key: str,
     es_pro: bool = True,       # ignorado, mantenido por compatibilidad
     es_favorito: bool = False,
+    pais_key: str = "",
+    region_key: str = "",
 ) -> InlineKeyboardMarkup:
     """Menú de acciones para un spot seleccionado."""
     fav_label = "💛 Quitar favorito" if es_favorito else "⭐ Favorito"
@@ -122,7 +124,7 @@ def kb_menu_spot(
         # Fila 4: favorito + navegación
         [
             InlineKeyboardButton(fav_label,         callback_data=fav_data),
-            InlineKeyboardButton("🗺️ Cambiar spot", callback_data="back:paises"),
+            InlineKeyboardButton("⬅️ Volver",        callback_data=f"back:spots:{pais_key}:{region_key}" if pais_key and region_key else "back:paises"),
         ],
     ]
     return InlineKeyboardMarkup(botones)
@@ -190,7 +192,7 @@ def kb_post_forecast(
             InlineKeyboardButton("🔬 Breakdown",    callback_data=f"action:breakdown:{spot_key}"),
         ],
         [
-            InlineKeyboardButton("🗺️ Cambiar spot", callback_data="back:paises"),
+            InlineKeyboardButton("🗺️ Cambiar spot", callback_data="back:paises"),  # vuelve a países
         ],
     ]
     return InlineKeyboardMarkup(botones)

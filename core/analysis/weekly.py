@@ -74,7 +74,7 @@ def analizar_semana(
     max_dias: int = 7,
 ) -> Optional[WeeklyAnalysis]:
     """
-    Analiza hasta 7 días de forecast y retorna el ranking semanal.
+    Analiza hasta 7 días de forecast desde HOY y retorna el ranking semanal.
 
     Args:
         forecast: Lista completa de ForecastHour (UTC-aware, hasta 7 días).
@@ -91,10 +91,12 @@ def analizar_semana(
 
     tz = spot.get_zoneinfo()
 
-    # Determinar fechas disponibles en el forecast
+    # Solo fechas desde hoy en adelante (sin días pasados)
+    hoy = datetime.now(tz).date()
     fechas_disponibles = sorted({
         h.timestamp.astimezone(tz).date()
         for h in forecast
+        if h.timestamp.astimezone(tz).date() >= hoy
     })[:max_dias]
 
     if not fechas_disponibles:

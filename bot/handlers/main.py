@@ -191,7 +191,10 @@ def handle_ajuste(update: Update, context: CallbackContext):
 
 def handle_callback(update: Update, context: CallbackContext):
     query = update.callback_query
-    query.answer()
+    try:
+        query.answer()
+    except BadRequest:
+        pass  # Query expirada
 
     user_id = query.from_user.id
     data = query.data or ""
@@ -298,10 +301,15 @@ def _cb_spot(query, user_id: int, spot_key: str):
     if spot.notas:
         texto += f"\n_{spot.notas}_"
 
-    _safe_edit(query, 
+    # Leer pais y region de la sesión para el botón Volver
+    session = session_store.get_session(user_id)
+    pais_key = session.get("pais", "") if session else ""
+    region_key = session.get("region", "") if session else ""
+
+    _safe_edit(query,
         texto,
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=kb_menu_spot(spot_key, es_favorito=es_fav),
+        reply_markup=kb_menu_spot(spot_key, es_favorito=es_fav, pais_key=pais_key, region_key=region_key),
     )
 
 
@@ -568,13 +576,25 @@ def _cb_back(query, user_id: int, destino: str):
     if destino == "paises":
         session_store.update_session(user_id, step="seleccion_pais")
         paises = listar_paises()
-        _safe_edit(query, 
+        _safe_edit(query,
             "🌍 ¿En qué país vas a surfear?",
             reply_markup=kb_seleccion_pais(paises),
         )
     elif destino.startswith("regiones:"):
         pais_key = destino.split(":")[1]
         _cb_pais(query, user_id, pais_key)
+    elif destino.startswith("spots:"):
+        parts = destino.split(":")
+        if len(parts) == 3:
+            pais_key, region_key = parts[1], parts[2]
+            _cb_region(query, user_id, pais_key, region_key)
+        else:
+            paises = listar_paises()
+            _safe_edit(query, "🌍 ¿En qué país vas a surfear?",
+                reply_markup=kb_seleccion_pais(paises))
+    elif destino.startswith("spot:"):
+        spot_key = destino.split(":", 1)[1]
+        _cb_spot(query, user_id, spot_key)
 
 
 # ------------------------------------------------------------------

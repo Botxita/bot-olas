@@ -29,6 +29,7 @@ PAISES_FLAGS = {
     "cl": "🇨🇱",
     "pe": "🇵🇪",
     "cr": "🇨🇷",
+    "uy": "🇺🇾",
 }
 
 
@@ -192,7 +193,7 @@ def kb_post_forecast(
             InlineKeyboardButton("🔬 Breakdown",    callback_data=f"action:breakdown:{spot_key}"),
         ],
         [
-            InlineKeyboardButton("🗺️ Cambiar spot", callback_data="back:paises"),  # vuelve a países
+            InlineKeyboardButton("⬅️ Volver al spot", callback_data=f"back:spot:{spot_key}"),
         ],
     ]
     return InlineKeyboardMarkup(botones)

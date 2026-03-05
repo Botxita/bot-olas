@@ -108,6 +108,8 @@ def formato_condiciones_actuales(
     lineas.append(f"💨  Viento:  `{w.velocidad_kmh:.0f} km/h · {_dir_a_texto(w.direccion_deg)}`")
     if w.rafaga_kmh > w.velocidad_kmh * 1.3:
         lineas.append(f"       ↪ Ráfagas: `{w.rafaga_kmh:.0f} km/h`")
+    if hour.temp_agua_c is not None:
+        lineas.append(f"🌡️  Agua:    `{hour.temp_agua_c:.1f}°C`")
 
     # Marea: tendencia + horarios de alta/baja del día
     lineas.append(_formato_marea_inline(t, tide_analysis, spot))

@@ -48,6 +48,7 @@ class ForecastHour:
     swell: SwellData
     wind: WindData
     tide: TideData
+    temp_agua_c: Optional[float] = None  # Temperatura del agua en °C (sea_surface_temperature)
 
 
 @dataclass

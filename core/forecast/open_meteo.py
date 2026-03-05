@@ -53,7 +53,8 @@ class OpenMeteoProvider(ForecastProviderBase):
         return "open-meteo"
 
     def get_forecast_48h(self, spot: SpotConfig) -> List[ForecastHour]:
-        """Obtiene las próximas 48 horas de pronóstico."""
+        """Obtiene los próximos 7 días de pronóstico (168h).
+        El nombre se mantiene por compatibilidad con la interfaz base."""
         marine_data = self._fetch_marine(spot)
         weather_data = self._fetch_weather(spot)
         return self._parse_combined(marine_data, weather_data)
@@ -87,8 +88,9 @@ class OpenMeteoProvider(ForecastProviderBase):
                 "swell_wave_period",
                 "swell_wave_direction",
                 "sea_level_height_msl",
+                "sea_surface_temperature",
             ]),
-            "forecast_days": 3,  # 3 días = 72h, tomamos las primeras 48
+            "forecast_days": 7,  # 7 días = 168h
             "timezone": "UTC",
         }
         try:
@@ -109,7 +111,7 @@ class OpenMeteoProvider(ForecastProviderBase):
                 "wind_direction_10m",
             ]),
             "wind_speed_unit": "kmh",
-            "forecast_days": 3,
+            "forecast_days": 7,
             "timezone": "UTC",
         }
         try:
@@ -129,8 +131,8 @@ class OpenMeteoProvider(ForecastProviderBase):
             weather_h = weather["hourly"]
             times = marine_h["time"]
 
-            # Limitar a 48 horas
-            limit = min(48, len(times))
+            # Tomar todas las horas disponibles (hasta 168h = 7 días)
+            limit = len(times)
 
             result = []
             for i in range(limit):
@@ -182,7 +184,9 @@ class OpenMeteoProvider(ForecastProviderBase):
                     es_exacto=False,
                 )
 
-                result.append(ForecastHour(timestamp=ts, swell=swell, wind=wind, tide=tide))
+                temp_agua = _safe_get(marine_h, "sea_surface_temperature", i)
+
+                result.append(ForecastHour(timestamp=ts, swell=swell, wind=wind, tide=tide, temp_agua_c=temp_agua))
 
             return result
 

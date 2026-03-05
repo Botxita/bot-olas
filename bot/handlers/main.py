@@ -583,7 +583,17 @@ def _cb_back(query, user_id: int, destino: str):
         )
     elif destino.startswith("regiones:"):
         pais_key = destino.split(":")[1]
-        _cb_pais(query, user_id, pais_key)
+        # Si el país tiene una sola región, volver directo a países
+        regiones = listar_regiones(pais_key)
+        if len(regiones) <= 1:
+            session_store.update_session(user_id, step="seleccion_pais")
+            paises = listar_paises()
+            _safe_edit(query,
+                "🌍 ¿En qué país vas a surfear?",
+                reply_markup=kb_seleccion_pais(paises),
+            )
+        else:
+            _cb_pais(query, user_id, pais_key)
     elif destino.startswith("spots:"):
         parts = destino.split(":")
         if len(parts) == 3:

@@ -59,6 +59,7 @@ from bot.formatters import (
     formato_dia_completo,
     formato_vista_horaria,
     formato_semana,
+    formato_proximas_olas,
 )
 from bot.keyboards import (
     kb_seleccion_pais,
@@ -465,7 +466,6 @@ def _mostrar_dia(query, spot_key: str, fecha: date):
         texto = formato_dia_completo(
             hour, breakdown, spot,
             daylight, tide_analysis, mejor_hora,
-            es_hoy=(fecha == fecha_hoy),
         )
 
         _safe_edit(query, 
@@ -483,13 +483,13 @@ def _mostrar_dia(query, spot_key: str, fecha: date):
 
 
 def _mostrar_ventanas(query, spot_key: str, spot):
-    """Ventanas óptimas de las próximas 48h."""
+    """Próximas olas — vista 48h hora a hora con horas buenas destacadas."""
     try:
-        _safe_edit(query, "⏳ Calculando ventanas...")
+        _safe_edit(query, "⏳ Calculando próximas olas...")
         forecast = _get_forecast_cached(spot_key)
         ventanas = detectar_ventanas(forecast, spot)
-        texto = formato_ventanas(ventanas, spot, forecast)
-        _safe_edit(query, 
+        texto = formato_proximas_olas(forecast, ventanas, spot)
+        _safe_edit(query,
             texto,
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=kb_post_forecast(spot_key),
@@ -583,17 +583,7 @@ def _cb_back(query, user_id: int, destino: str):
         )
     elif destino.startswith("regiones:"):
         pais_key = destino.split(":")[1]
-        # Si el país tiene una sola región, volver directo a países
-        regiones = listar_regiones(pais_key)
-        if len(regiones) <= 1:
-            session_store.update_session(user_id, step="seleccion_pais")
-            paises = listar_paises()
-            _safe_edit(query,
-                "🌍 ¿En qué país vas a surfear?",
-                reply_markup=kb_seleccion_pais(paises),
-            )
-        else:
-            _cb_pais(query, user_id, pais_key)
+        _cb_pais(query, user_id, pais_key)
     elif destino.startswith("spots:"):
         parts = destino.split(":")
         if len(parts) == 3:

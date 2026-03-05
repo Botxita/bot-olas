@@ -537,6 +537,118 @@ def formato_dia_completo(
 # Helper interno
 # ---------------------------------------------------------------------------
 
+def formato_proximas_olas(
+    forecast: list,
+    ventanas: list,
+    spot: SpotConfig,
+) -> str:
+    """
+    Vista de próximas 48h: hora a hora con horas buenas destacadas.
+    Siempre muestra algo útil aunque no haya ventanas óptimas.
+    """
+    from datetime import timezone as _tz_mod
+    from core.scoring.engine import calcular_score
+    from core.analysis.daylight import get_daylight_for_forecast_hour, is_daylight
+    from collections import defaultdict
+
+    tz = _tz(spot)
+    now = datetime.now(_tz_mod.utc)
+    lineas = []
+
+    lineas.append(f"🏄 *Próximas olas · {spot.nombre}*")
+    lineas.append(f"📍 {spot.ciudad}")
+    lineas.append("")
+
+    # Próximas 48h, solo horas diurnas
+    horas_48h = []
+    for h in forecast:
+        if h.timestamp <= now:
+            continue
+        if (h.timestamp - now).total_seconds() / 3600 > 48:
+            break
+        try:
+            daylight = get_daylight_for_forecast_hour(spot, h.timestamp)
+            if is_daylight(h.timestamp, daylight):
+                horas_48h.append(h)
+        except Exception:
+            pass
+
+    if not horas_48h:
+        lineas.append("😔 Sin datos para las próximas 48h.")
+        return "\n".join(lineas)
+
+    # Calcular scores
+    scored = []
+    for h in horas_48h:
+        try:
+            bd = calcular_score(h, spot)
+            scored.append((h, bd))
+        except Exception:
+            pass
+
+    if not scored:
+        lineas.append("😔 No se pudo calcular el pronóstico.")
+        return "\n".join(lineas)
+
+    # Agrupar por día
+    dias = defaultdict(list)
+    for h, bd in scored:
+        dias[h.timestamp.astimezone(tz).date()].append((h, bd))
+
+    # Mostrar cada día
+    for fecha, horas_dia in sorted(dias.items()):
+        dia = _dia_relativo(horas_dia[0][0].timestamp, spot)
+        fecha_str = fecha.strftime("%d/%m")
+        mejor_score = max(bd.score_100 for _, bd in horas_dia)
+        emoji_dia = _emoji_score(mejor_score)
+
+        lineas.append(SEPARADOR)
+        lineas.append(f"{emoji_dia} *{dia} {fecha_str}* — mejor: {mejor_score}/100")
+        lineas.append("")
+        lineas.append("`hora  score  swell       viento`")
+
+        for h, bd in horas_dia:
+            hora_str = h.timestamp.astimezone(tz).strftime("%H:%M")
+            score = bd.score_100
+            emoji = _emoji_score(score)
+            swell_str = f"{h.swell.altura_m:.1f}m/{h.swell.periodo_s:.0f}s"
+            viento_str = f"{h.wind.velocidad_kmh:.0f}km/h {_dir_a_texto(h.wind.direccion_deg)}"
+            marca = " ✓" if score >= 60 else ""
+            lineas.append(f"{emoji} `{hora_str}  {score:3d}  {swell_str:<8}  {viento_str}`{marca}")
+
+        lineas.append("")
+
+    # Si no hay ninguna hora buena en 48h, buscar próxima oportunidad
+    horas_buenas = [(h, bd) for h, bd in scored if bd.score_100 >= 60]
+    if not horas_buenas:
+        proxima = None
+        for h in forecast:
+            if h.timestamp <= now:
+                continue
+            if (h.timestamp - now).total_seconds() / 3600 <= 48:
+                continue
+            try:
+                daylight = get_daylight_for_forecast_hour(spot, h.timestamp)
+                if not is_daylight(h.timestamp, daylight):
+                    continue
+                bd = calcular_score(h, spot)
+                if bd.score_100 >= 55:
+                    proxima = (h, bd)
+                    break
+            except Exception:
+                pass
+
+        if proxima:
+            h, bd = proxima
+            dia = _dia_relativo(h.timestamp, spot)
+            hora_str = _ts_local(h.timestamp, spot)
+            lineas.append(f"💡 _Próxima oportunidad: {dia} {hora_str} hs ({bd.score_100}/100)_")
+        else:
+            lineas.append("_😔 Sin condiciones buenas en los próximos 7 días._")
+
+    return "\n".join(lineas)
+
+
 def _formato_marea_inline(tide_data, tide_analysis, spot: SpotConfig) -> str:
     """
     Línea de marea legible para el bloque CONDICIONES.

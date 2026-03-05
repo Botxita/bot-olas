@@ -114,7 +114,7 @@ def kb_menu_spot(
         ],
         # Fila 2: vistas avanzadas
         [
-            InlineKeyboardButton("⏱ Ventanas 48h", callback_data=f"action:ventanas:{spot_key}"),
+            InlineKeyboardButton("🏄 Próximas olas", callback_data=f"action:ventanas:{spot_key}"),
             InlineKeyboardButton("📊 Hora a hora",  callback_data=f"action:horaria:{spot_key}"),
         ],
         # Fila 3: semana + breakdown
@@ -185,7 +185,7 @@ def kb_post_forecast(
             InlineKeyboardButton("📅 Por fecha",    callback_data=f"action:fecha:{spot_key}"),
         ],
         [
-            InlineKeyboardButton("⏱ Ventanas 48h", callback_data=f"action:ventanas:{spot_key}"),
+            InlineKeyboardButton("🏄 Próximas olas", callback_data=f"action:ventanas:{spot_key}"),
             InlineKeyboardButton("📊 Hora a hora",  callback_data=f"action:horaria:{spot_key}"),
         ],
         [

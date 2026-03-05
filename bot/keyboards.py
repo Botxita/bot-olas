@@ -40,15 +40,12 @@ def kb_seleccion_pais(
     """Países disponibles, dos por fila. Si hay favoritos, se muestran arriba."""
     botones = []
 
-    # --- Sección de favoritos (si existen) ---
+    # --- Favoritos (si existen) ---
     if favoritos:
-        botones.append([InlineKeyboardButton("⭐ Mis favoritos", callback_data="noop")])
         for spot_key, nombre in favoritos:
             botones.append([InlineKeyboardButton(
-                f"⭐ {nombre}", callback_data=f"spot:{spot_key}"
+                f"⭐ {nombre}", callback_data=f"spot_from_home:{spot_key}"
             )])
-        # Separador visual antes de los países
-        botones.append([InlineKeyboardButton("─────────────────", callback_data="noop")])
 
     # --- Países ---
     fila = []

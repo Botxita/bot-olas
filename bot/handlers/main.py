@@ -225,9 +225,15 @@ def handle_callback(update: Update, context: CallbackContext):
     data = query.data or ""
 
     if data == "noop":
-        return  # Botones decorativos (separadores, encabezados)
+        return  # Botones decorativos
 
-    if data.startswith("pais:"):
+    if data.startswith("spot_from_home:"):
+        # Spot abierto desde pantalla de inicio (favoritos) → limpiar pais/region de sesión
+        spot_key = data[15:]
+        session_store.update_session(user_id, step="menu_spot", pais="", region="")
+        _cb_spot(query, user_id, spot_key)
+
+    elif data.startswith("pais:"):
         _cb_pais(query, user_id, data[5:])
 
     elif data.startswith("region:"):

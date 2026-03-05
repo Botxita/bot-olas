@@ -115,6 +115,21 @@ def _fecha_local_hoy(spot) -> date:
     return datetime.now(spot.get_zoneinfo()).date()
 
 
+def _resolver_nombres_favoritos(favs_keys: list) -> list:
+    """Convierte lista de spot_keys en lista de (spot_key, nombre) para el teclado."""
+    resultado = []
+    for key in favs_keys:
+        try:
+            spot = get_spot(key)
+            nombre = spot.nombre
+            if spot.ciudad and spot.ciudad != spot.nombre:
+                nombre = f"{spot.ciudad} · {spot.nombre}"
+            resultado.append((key, nombre))
+        except KeyError:
+            pass  # spot eliminado del registry, ignorar silenciosamente
+    return resultado
+
+
 # ------------------------------------------------------------------
 # /start
 # ------------------------------------------------------------------
@@ -126,16 +141,25 @@ def handle_start(update: Update, context: CallbackContext):
     session_store.update_session(user_id, step="seleccion_pais")
 
     paises = listar_paises()
-    texto = (
-        f"🌊 Hola *{first_name}*\\! Bienvenido al *Olas Surfer Bot*\\.\n\n"
-        "Consultá condiciones, ventanas, mareas y el mejor día de la semana "
-        "para cualquier spot de Latinoamérica\\.\n\n"
-        "¿En qué país vas a surfear?"
-    )
+    favs_keys = session_store.get_favoritos(user_id)
+    favs = _resolver_nombres_favoritos(favs_keys)
+
+    if favs:
+        texto = (
+            f"🌊 Hola *{first_name}*\\! Bienvenido al *Olas Surfer Bot*\\.\n\n"
+            "¿Dónde vas a surfear hoy? 🏄‍♂️🌍"
+        )
+    else:
+        texto = (
+            f"🌊 Hola *{first_name}*\\! Bienvenido al *Olas Surfer Bot*\\.\n\n"
+            "Consultá condiciones, ventanas, mareas y el mejor día de la semana "
+            "para cualquier spot de Latinoamérica\\.\n\n"
+            "¿Dónde vas a surfear? 🏄‍♂️🌍"
+        )
     update.message.reply_text(
         texto,
         parse_mode=ParseMode.MARKDOWN_V2,
-        reply_markup=kb_seleccion_pais(paises),
+        reply_markup=kb_seleccion_pais(paises, favoritos=favs),
     )
 
 
@@ -199,6 +223,9 @@ def handle_callback(update: Update, context: CallbackContext):
 
     user_id = query.from_user.id
     data = query.data or ""
+
+    if data == "noop":
+        return  # Botones decorativos (separadores, encabezados)
 
     if data.startswith("pais:"):
         _cb_pais(query, user_id, data[5:])
@@ -577,9 +604,10 @@ def _cb_back(query, user_id: int, destino: str):
     if destino == "paises":
         session_store.update_session(user_id, step="seleccion_pais")
         paises = listar_paises()
+        favs = _resolver_nombres_favoritos(session_store.get_favoritos(user_id))
         _safe_edit(query,
-            "🌍 ¿En qué país vas a surfear?",
-            reply_markup=kb_seleccion_pais(paises),
+            "¿Dónde vas a surfear? 🏄‍♂️🌍",
+            reply_markup=kb_seleccion_pais(paises, favoritos=favs),
         )
     elif destino.startswith("regiones:"):
         pais_key = destino.split(":")[1]
@@ -588,9 +616,10 @@ def _cb_back(query, user_id: int, destino: str):
         if len(regiones) <= 1:
             session_store.update_session(user_id, step="seleccion_pais")
             paises = listar_paises()
+            favs = _resolver_nombres_favoritos(session_store.get_favoritos(user_id))
             _safe_edit(query,
-                "🌍 ¿En qué país vas a surfear?",
-                reply_markup=kb_seleccion_pais(paises),
+                "¿Dónde vas a surfear? 🏄‍♂️🌍",
+                reply_markup=kb_seleccion_pais(paises, favoritos=favs),
             )
         else:
             _cb_pais(query, user_id, pais_key)
@@ -601,8 +630,9 @@ def _cb_back(query, user_id: int, destino: str):
             _cb_region(query, user_id, pais_key, region_key)
         else:
             paises = listar_paises()
-            _safe_edit(query, "🌍 ¿En qué país vas a surfear?",
-                reply_markup=kb_seleccion_pais(paises))
+            favs = _resolver_nombres_favoritos(session_store.get_favoritos(user_id))
+            _safe_edit(query, "¿Dónde vas a surfear? 🏄‍♂️🌍",
+                reply_markup=kb_seleccion_pais(paises, favoritos=favs))
     elif destino.startswith("spot:"):
         spot_key = destino.split(":", 1)[1]
         _cb_spot(query, user_id, spot_key)
@@ -616,9 +646,11 @@ def _cb_fav_add(query, user_id: int, spot_key: str):
     session_store.add_favorito(user_id, spot_key)
     query.answer("⭐ Agregado a favoritos")
     try:
-        favs = session_store.get_favoritos(user_id)
+        session = session_store.get_session(user_id)
+        pais_key = session.get("pais", "") if session else ""
+        region_key = session.get("region", "") if session else ""
         query.message.edit_reply_markup(
-            kb_menu_spot(spot_key, es_favorito=True)
+            kb_menu_spot(spot_key, es_favorito=True, pais_key=pais_key, region_key=region_key)
         )
     except Exception:
         pass
@@ -628,8 +660,11 @@ def _cb_fav_del(query, user_id: int, spot_key: str):
     session_store.remove_favorito(user_id, spot_key)
     query.answer("💔 Quitado de favoritos")
     try:
+        session = session_store.get_session(user_id)
+        pais_key = session.get("pais", "") if session else ""
+        region_key = session.get("region", "") if session else ""
         query.message.edit_reply_markup(
-            kb_menu_spot(spot_key, es_favorito=False)
+            kb_menu_spot(spot_key, es_favorito=False, pais_key=pais_key, region_key=region_key)
         )
     except Exception:
         pass

@@ -33,9 +33,24 @@ PAISES_FLAGS = {
 }
 
 
-def kb_seleccion_pais(paises: List[Tuple[str, str]]) -> InlineKeyboardMarkup:
-    """Países disponibles, dos por fila."""
+def kb_seleccion_pais(
+    paises: List[Tuple[str, str]],
+    favoritos: List[Tuple[str, str]] = None,  # lista de (spot_key, nombre)
+) -> InlineKeyboardMarkup:
+    """Países disponibles, dos por fila. Si hay favoritos, se muestran arriba."""
     botones = []
+
+    # --- Sección de favoritos (si existen) ---
+    if favoritos:
+        botones.append([InlineKeyboardButton("⭐ Mis favoritos", callback_data="noop")])
+        for spot_key, nombre in favoritos:
+            botones.append([InlineKeyboardButton(
+                f"⭐ {nombre}", callback_data=f"spot:{spot_key}"
+            )])
+        # Separador visual antes de los países
+        botones.append([InlineKeyboardButton("─────────────────", callback_data="noop")])
+
+    # --- Países ---
     fila = []
     for i, (key, nombre) in enumerate(paises):
         flag = PAISES_FLAGS.get(key, "🌍")
@@ -46,6 +61,7 @@ def kb_seleccion_pais(paises: List[Tuple[str, str]]) -> InlineKeyboardMarkup:
             fila = []
     if fila:
         botones.append(fila)
+
     return InlineKeyboardMarkup(botones)
 
 

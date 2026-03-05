@@ -446,19 +446,32 @@ def formato_dia_completo(
     daylight: DaylightInfo,
     tide_analysis: TideAnalysis,
     mejor_hora: Optional[BestHourResult],
+    es_hoy: bool = False,
 ) -> str:
     """
-    Mensaje completo para un día específico:
-    condiciones actuales + luz solar + mareas + mejor hora.
-    Reemplaza formato_condiciones_actuales cuando se consulta por fecha.
+    Mensaje para un día específico consultado por fecha.
+
+    Si es_hoy=True: muestra condiciones actuales + mejor hora al final.
+    Si es_hoy=False: muestra directamente la mejor hora del día como protagonista,
+                     con condiciones completas de esa hora.
     """
     lineas = []
 
+    # Usar mejor_hora como fuente principal si existe y no es hoy
+    h_display = hour
+    bd_display = breakdown
+    if not es_hoy and mejor_hora is not None:
+        h_display = mejor_hora.hour
+        bd_display = mejor_hora.breakdown
+
+    tz_spot = _tz(spot)
+    fecha_display = h_display.timestamp.astimezone(tz_spot)
+    dia = _dia_relativo(h_display.timestamp, spot)
+    fecha_str = fecha_display.strftime("%d/%m")
+
     # Header
     lineas.append(f"🌊 *{spot.ciudad} · {spot.nombre}*")
-    dia = _dia_relativo(hour.timestamp, spot)
-    hora = _ts_local(hour.timestamp, spot)
-    lineas.append(f"📅 {dia} · {hora} hs")
+    lineas.append(f"📅 {dia} {fecha_str}")
     lineas.append("")
 
     # Luz solar
@@ -466,18 +479,25 @@ def formato_dia_completo(
     lineas.append("")
     lineas.append(SEPARADOR)
 
-    # Condiciones
-    lineas.append("*CONDICIONES AHORA*")
-    s = hour.swell
-    w = hour.wind
-    t = hour.tide
+    if es_hoy:
+        lineas.append("*CONDICIONES AHORA*")
+    else:
+        mejor_hora_str = _ts_local(h_display.timestamp, spot)
+        lineas.append(f"*MEJOR HORA DEL DÍA · {mejor_hora_str} hs*")
+        lineas.append(f"{_estrellas(bd_display.score_total)}  *({bd_display.score_100}/100) · {bd_display.etiqueta}*")
+        lineas.append("")
+
+    s = h_display.swell
+    w = h_display.wind
+    t = h_display.tide
     lineas.append(f"🌊  Swell:   `{s.altura_m:.1f}m · {s.periodo_s:.0f}s · {_dir_a_texto(s.direccion_deg)}`")
     lineas.append(f"💨  Viento:  `{w.velocidad_kmh:.0f} km/h · {_dir_a_texto(w.direccion_deg)}`")
     if w.rafaga_kmh > w.velocidad_kmh * 1.3:
         lineas.append(f"       ↪ Ráfagas: `{w.rafaga_kmh:.0f} km/h`")
+    if h_display.temp_agua_c is not None:
+        lineas.append(f"🌡️  Agua:    `{h_display.temp_agua_c:.1f}°C`")
     lineas.append(_formato_marea_inline(t, tide_analysis, spot))
     if tide_analysis is not None and tide_analysis.tiene_extremos_claros and tide_analysis.eventos:
-        tz_spot = _tz(spot)
         partes = []
         for ev in tide_analysis.eventos[:4]:
             hora_ev = ev.timestamp.astimezone(tz_spot).strftime("%H:%M")
@@ -487,15 +507,16 @@ def formato_dia_completo(
     lineas.append("")
     lineas.append(SEPARADOR)
 
-    # Score
-    lineas.append("*CALIDAD*")
-    lineas.append(f"{_estrellas(breakdown.score_total)}  *({breakdown.score_100}/100) · {breakdown.etiqueta}*")
-    lineas.append("")
-    for f_pos in breakdown.flags_positivos:
+    # Score + flags
+    if es_hoy:
+        lineas.append("*CALIDAD*")
+        lineas.append(f"{_estrellas(bd_display.score_total)}  *({bd_display.score_100}/100) · {bd_display.etiqueta}*")
+        lineas.append("")
+    for f_pos in bd_display.flags_positivos:
         lineas.append(f"✅ {f_pos}")
-    for f_neg in breakdown.flags_negativos:
+    for f_neg in bd_display.flags_negativos:
         lineas.append(f"❌ {f_neg}")
-    for f_neu in breakdown.flags_neutros:
+    for f_neu in bd_display.flags_neutros:
         if "proxy MSL" not in f_neu and "proxy_msl" not in f_neu.lower():
             lineas.append(f"ℹ️  {f_neu}")
 
@@ -504,8 +525,8 @@ def formato_dia_completo(
         lineas.append("")
         lineas.append(formato_mareas(tide_analysis, spot))
 
-    # Mejor hora
-    if mejor_hora:
+    # Si es hoy, mostrar mejor hora al final como bonus
+    if es_hoy and mejor_hora is not None:
         lineas.append("")
         lineas.append(formato_mejor_hora(mejor_hora, spot))
 

@@ -106,6 +106,10 @@ def detectar_ventanas(
         if ventana:
             ventanas.append(ventana)
 
+    # Filtrar ventanas que ya terminaron
+    now = datetime.now(timezone.utc)
+    ventanas = [v for v in ventanas if v.fin > now]
+
     # Ordenar por score promedio descendente y retornar top N
     ventanas.sort(key=lambda v: v.score_promedio, reverse=True)
     return ventanas[:top_n]

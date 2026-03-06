@@ -18,6 +18,7 @@ NOTA IMPORTANTE sobre mareas:
 """
 
 import logging
+import time
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -38,8 +39,31 @@ logger = logging.getLogger(__name__)
 _MARINE_URL = "https://marine-api.open-meteo.com/v1/marine"
 _WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
 
-# Timeout para requests
-_TIMEOUT_S = 15
+# Timeout y reintentos
+_TIMEOUT_S = 20
+_MAX_RETRIES = 3
+_RETRY_DELAYS = [2, 5, 10]  # segundos entre reintentos
+
+
+def _get_with_retry(url: str, params: dict, label: str) -> dict:
+    """GET con reintentos y backoff. Lanza ForecastProviderError si agotan los intentos."""
+    last_exc = None
+    for attempt, delay in enumerate((_RETRY_DELAYS + [0])[:_MAX_RETRIES], start=1):
+        try:
+            resp = requests.get(url, params=params, timeout=_TIMEOUT_S)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException as e:
+            last_exc = e
+            if attempt < _MAX_RETRIES:
+                logger.warning(
+                    "%s: intento %d/%d falló (%s). Reintentando en %ds...",
+                    label, attempt, _MAX_RETRIES, type(e).__name__, delay,
+                )
+                time.sleep(delay)
+            else:
+                logger.error("%s: todos los intentos fallaron. Último error: %s", label, e)
+    raise ForecastProviderError(f"Error al llamar {label}: {last_exc}") from last_exc
 
 
 class OpenMeteoProvider(ForecastProviderBase):
@@ -90,15 +114,10 @@ class OpenMeteoProvider(ForecastProviderBase):
                 "sea_level_height_msl",
                 "sea_surface_temperature",
             ]),
-            "forecast_days": 7,  # 7 días = 168h
+            "forecast_days": 7,
             "timezone": "UTC",
         }
-        try:
-            resp = requests.get(_MARINE_URL, params=params, timeout=_TIMEOUT_S)
-            resp.raise_for_status()
-            return resp.json()
-        except requests.RequestException as e:
-            raise ForecastProviderError(f"Error al llamar Marine API: {e}") from e
+        return _get_with_retry(_MARINE_URL, params, "Marine API")
 
     def _fetch_weather(self, spot: SpotConfig) -> dict:
         """Llama a la Weather API para datos de viento."""
@@ -114,12 +133,7 @@ class OpenMeteoProvider(ForecastProviderBase):
             "forecast_days": 7,
             "timezone": "UTC",
         }
-        try:
-            resp = requests.get(_WEATHER_URL, params=params, timeout=_TIMEOUT_S)
-            resp.raise_for_status()
-            return resp.json()
-        except requests.RequestException as e:
-            raise ForecastProviderError(f"Error al llamar Weather API: {e}") from e
+        return _get_with_retry(_WEATHER_URL, params, "Weather API")
 
     def _parse_combined(self, marine: dict, weather: dict) -> List[ForecastHour]:
         """

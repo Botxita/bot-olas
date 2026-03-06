@@ -178,7 +178,7 @@ def kb_seleccion_fecha(spot_key: str, fecha_base: date = None) -> InlineKeyboard
         botones.append(fila)
 
     botones.append([InlineKeyboardButton(
-        "⬅️ Volver al spot", callback_data=f"spot:{spot_key}"
+        "⬅️ Volver", callback_data=f"spot:{spot_key}"
     )])
     return InlineKeyboardMarkup(botones)
 
@@ -194,7 +194,7 @@ def kb_post_forecast(
     """Botones que aparecen después de mostrar cualquier resultado."""
     botones = [
         [
-            InlineKeyboardButton("🔄 Actualizar",   callback_data=f"action:ahora:{spot_key}"),
+            InlineKeyboardButton("🌊 Ahora",   callback_data=f"action:ahora:{spot_key}"),
             InlineKeyboardButton("📅 Por fecha",    callback_data=f"action:fecha:{spot_key}"),
         ],
         [
@@ -206,7 +206,7 @@ def kb_post_forecast(
             InlineKeyboardButton("🔬 Breakdown",    callback_data=f"action:breakdown:{spot_key}"),
         ],
         [
-            InlineKeyboardButton("⬅️ Volver al spot", callback_data=f"back:spot:{spot_key}"),
+            InlineKeyboardButton("⬅️ Volver", callback_data=f"back:spot:{spot_key}"),
         ],
     ]
     return InlineKeyboardMarkup(botones)

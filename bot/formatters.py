@@ -543,13 +543,12 @@ def formato_proximas_olas(
     spot: SpotConfig,
 ) -> str:
     """
-    Vista de próximas 48h: hora a hora con horas buenas destacadas.
-    Siempre muestra algo útil aunque no haya ventanas óptimas.
+    Muestra las próximas ventanas surfeables como bloques concretos.
+    Si no hay ventanas, indica cuándo es la próxima oportunidad.
     """
     from datetime import timezone as _tz_mod
     from core.scoring.engine import calcular_score
     from core.analysis.daylight import get_daylight_for_forecast_hour, is_daylight
-    from collections import defaultdict
 
     tz = _tz(spot)
     now = datetime.now(_tz_mod.utc)
@@ -557,70 +556,12 @@ def formato_proximas_olas(
 
     lineas.append(f"🏄 *Próximas olas · {spot.nombre}*")
     lineas.append(f"📍 {spot.ciudad}")
-    lineas.append("")
 
-    # Próximas 48h, solo horas diurnas
-    horas_48h = []
-    for h in forecast:
-        if h.timestamp <= now:
-            continue
-        if (h.timestamp - now).total_seconds() / 3600 > 48:
-            break
-        try:
-            daylight = get_daylight_for_forecast_hour(spot, h.timestamp)
-            if is_daylight(h.timestamp, daylight):
-                horas_48h.append(h)
-        except Exception:
-            pass
-
-    if not horas_48h:
-        lineas.append("😔 Sin datos para las próximas 48h.")
-        return "\n".join(lineas)
-
-    # Calcular scores
-    scored = []
-    for h in horas_48h:
-        try:
-            bd = calcular_score(h, spot)
-            scored.append((h, bd))
-        except Exception:
-            pass
-
-    if not scored:
-        lineas.append("😔 No se pudo calcular el pronóstico.")
-        return "\n".join(lineas)
-
-    # Agrupar por día
-    dias = defaultdict(list)
-    for h, bd in scored:
-        dias[h.timestamp.astimezone(tz).date()].append((h, bd))
-
-    # Mostrar cada día
-    for fecha, horas_dia in sorted(dias.items()):
-        dia = _dia_relativo(horas_dia[0][0].timestamp, spot)
-        fecha_str = fecha.strftime("%d/%m")
-        mejor_score = max(bd.score_100 for _, bd in horas_dia)
-        emoji_dia = _emoji_score(mejor_score)
-
-        lineas.append(SEPARADOR)
-        lineas.append(f"{emoji_dia} *{dia} {fecha_str}* — mejor: {mejor_score}/100")
+    if not ventanas:
         lineas.append("")
-        lineas.append("`hora  score  swell       viento`")
+        lineas.append("_No hay ventanas buenas en las próximas 48hs._")
 
-        for h, bd in horas_dia:
-            hora_str = h.timestamp.astimezone(tz).strftime("%H:%M")
-            score = bd.score_100
-            emoji = _emoji_score(score)
-            swell_str = f"{h.swell.altura_m:.1f}m/{h.swell.periodo_s:.0f}s"
-            viento_str = f"{h.wind.velocidad_kmh:.0f}km/h {_dir_a_texto(h.wind.direccion_deg)}"
-            marca = " ✓" if score >= 60 else ""
-            lineas.append(f"{emoji} `{hora_str}  {score:3d}  {swell_str:<8}  {viento_str}`{marca}")
-
-        lineas.append("")
-
-    # Si no hay ninguna hora buena en 48h, buscar próxima oportunidad
-    horas_buenas = [(h, bd) for h, bd in scored if bd.score_100 >= 60]
-    if not horas_buenas:
+        # Buscar próxima hora decente más allá de las 48h
         proxima = None
         for h in forecast:
             if h.timestamp <= now:
@@ -646,6 +587,44 @@ def formato_proximas_olas(
         else:
             lineas.append("_😔 Sin condiciones buenas en los próximos 7 días._")
 
+        return "\n".join(lineas)
+
+    # Ordenar ventanas cronológicamente para mostrarlas
+    ventanas_orden = sorted(ventanas, key=lambda v: v.inicio)
+
+    for v in ventanas_orden:
+        lineas.append("")
+        lineas.append(SEPARADOR)
+
+        # Encabezado: día + horario
+        dia = _dia_relativo(v.inicio, spot)
+        fecha_str = v.inicio.astimezone(tz).strftime("%d/%m")
+        inicio_str = v.inicio.astimezone(tz).strftime("%H:%M")
+        fin_str = v.fin.astimezone(tz).strftime("%H:%M")
+        score = round(v.score_promedio * 100)
+        emoji = _emoji_score(score)
+
+        duracion_h = round((v.fin - v.inicio).total_seconds() / 3600)
+        duracion_str = f"{duracion_h}h" if duracion_h > 1 else "~1h"
+
+        lineas.append(f"{emoji} *{dia} {fecha_str} · {inicio_str}–{fin_str}* ({duracion_str})")
+        lineas.append(f"📊 Score: *{score}/100*")
+
+        # Datos de la hora pico
+        hora_pico = next(
+            (h for h in forecast if h.timestamp == v.hora_pico), None
+        )
+        if hora_pico:
+            swell_str = f"{hora_pico.swell.altura_m:.1f}m / {hora_pico.swell.periodo_s:.0f}s"
+            viento_str = f"{hora_pico.wind.velocidad_kmh:.0f} km/h {_dir_a_texto(hora_pico.wind.direccion_deg)}"
+            lineas.append(f"🌊 Swell: {swell_str}")
+            lineas.append(f"💨 Viento: {viento_str}")
+
+        # Descripción del detector (offshore, groundswell, etc.)
+        if v.descripcion:
+            lineas.append(f"_{v.descripcion}_")
+
+    lineas.append("")
     return "\n".join(lineas)
 
 

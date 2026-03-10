@@ -84,12 +84,20 @@ def detectar_ventanas(
             logger.warning("Error calculando score para %s: %s", hour.timestamp, e)
             continue
 
-    # Agrupar en ventanas contiguas por encima del umbral
+    # Agrupar en ventanas contiguas por encima del umbral.
+    # Corte adicional cuando cambia el día local (evita ventanas que cruzan medianoche).
     ventanas_raw: List[List[tuple]] = []
     current_window: List[tuple] = []
+    tz = spot.get_zoneinfo()
 
     for hour, bd in scored:
         if bd.score_total >= umbral:
+            # Cortar si el día local cambió respecto a la hora anterior en la ventana
+            if current_window:
+                ultimo_ts = current_window[-1][0].timestamp
+                if hour.timestamp.astimezone(tz).date() != ultimo_ts.astimezone(tz).date():
+                    ventanas_raw.append(current_window)
+                    current_window = []
             current_window.append((hour, bd))
         else:
             if current_window:

@@ -226,14 +226,25 @@ def _calcular_tendencia(
 ) -> Tuple[str, Optional[datetime]]:
     """
     Determina tendencia actual y estima próximo cambio de tendencia.
-    Usa las primeras N horas para calcular pendiente reciente.
+    Calcula la pendiente desde el índice más cercano al momento actual
+    para que sea correcto cuando el array incluye horas pasadas del día.
     """
     if len(niveles) < 2:
         return "desconocida", None
 
-    # Pendiente reciente: diferencia entre hora 0 y hora 2 (o siguiente disponible)
-    n = min(3, len(niveles))
-    pendiente = niveles[n - 1] - niveles[0]
+    # Encontrar índice más cercano a ahora
+    from datetime import datetime as _dt, timezone as _tz
+    now = _dt.now(_tz.utc)
+    idx_now = min(range(len(timestamps)), key=lambda i: abs((timestamps[i] - now).total_seconds()))
+
+    # Pendiente: diferencia entre hora actual y 2 horas más tarde (o lo que quede)
+    idx_end = min(idx_now + 2, len(niveles) - 1)
+    if idx_end == idx_now:
+        # Solo queda una hora — usar diferencia con la anterior
+        idx_start = max(0, idx_now - 1)
+        pendiente = niveles[idx_now] - niveles[idx_start]
+    else:
+        pendiente = niveles[idx_end] - niveles[idx_now]
 
     if pendiente > 0.02:
         tendencia = "subiendo"
@@ -242,9 +253,9 @@ def _calcular_tendencia(
     else:
         tendencia = "estable"
 
-    # Estimar próximo cambio buscando el primer extremo en la serie completa
+    # Estimar próximo cambio buscando el primer extremo DESDE el índice actual
     proximo_cambio = None
-    for i in range(1, len(niveles) - 1):
+    for i in range(max(1, idx_now), len(niveles) - 1):
         prev_ = niveles[i - 1]
         curr = niveles[i]
         next_ = niveles[i + 1]

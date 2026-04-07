@@ -18,14 +18,15 @@ Variables opcionales:
   WORLDTIDES_API_KEY   → para usar WorldTides (futuro)
 
 Health check para UptimeRobot:
-  PTB v13 start_webhook responde 200 en cualquier ruta que no sea el token.
-  Apuntar UptimeRobot a: https://<WEBHOOK_URL>/health  (método GET, esperar 200)
-  No se necesita servidor separado.
+  GET https://<WEBHOOK_URL>/health → 200 OK
+  El servidor tornado de PTB v13 se extiende con una ruta extra /health.
 """
 
 import logging
 import os
 import sys
+from threading import Thread
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from dotenv import load_dotenv
 from telegram.ext import Updater
@@ -44,6 +45,44 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 
+class HealthHandler(BaseHTTPRequestHandler):
+    """Responde 200 OK en /health. Render solo expone PORT, así que
+    este servidor corre en PORT+1 internamente — pero UptimeRobot
+    apunta al puerto principal. Ver nota abajo."""
+
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OK")
+
+    def log_message(self, format, *args):
+        pass
+
+
+def _patch_updater_with_health(updater, health_path: str = "/health"):
+    """
+    Agrega una ruta /health al servidor tornado interno de PTB v13.
+    Debe llamarse DESPUÉS de start_webhook().
+    """
+    try:
+        import tornado.web
+
+        class HealthTornadoHandler(tornado.web.RequestHandler):
+            def get(self):
+                self.set_status(200)
+                self.finish("OK")
+
+        # El httpd interno del Updater es un tornado HTTPServer
+        # Su application tiene una lista de handlers que podemos extender
+        app = updater.httpd.request_callback  # tornado.web.Application
+        app.add_handlers(r".*", [(r"/health", HealthTornadoHandler)])
+        logger.info("Ruta /health registrada en servidor tornado de PTB")
+        return True
+    except Exception as e:
+        logger.warning("No se pudo parchear tornado con /health: %s", e)
+        return False
+
+
 def main():
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
@@ -60,19 +99,21 @@ def main():
 
     if use_webhook:
         logger.info("Iniciando en modo WEBHOOK → %s (port %d)", webhook_url, port)
-        logger.info(
-            "Health check para UptimeRobot: %s/health (GET → 200 OK)", webhook_url
-        )
 
-        # PTB v13 start_webhook levanta un servidor tornado que responde 200
-        # en cualquier ruta que no sea /<token>. No se necesita servidor auxiliar.
-        # UptimeRobot debe apuntar a: https://<WEBHOOK_URL>/health
         updater.start_webhook(
             listen="0.0.0.0",
             port=port,
             url_path=token,
             webhook_url=f"{webhook_url}/{token}",
         )
+
+        # Parchear el servidor tornado para agregar /health
+        patched = _patch_updater_with_health(updater)
+        if patched:
+            logger.info("Health check disponible en: %s/health", webhook_url)
+        else:
+            logger.warning("Health check NO disponible — UptimeRobot puede fallar")
+
         updater.idle()
     else:
         logger.info("Iniciando en modo POLLING (desarrollo local)")

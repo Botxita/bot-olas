@@ -20,11 +20,6 @@ load_dotenv()
 
 
 def _patch_health(updater):
-    """
-    Inyecta /health en el servidor tornado de PTB v13.
-    WebhookServer.http_server es el tornado.httpserver.HTTPServer real.
-    Su request_callback es la tornado.web.Application.
-    """
     try:
         import tornado.web
 
@@ -33,12 +28,16 @@ def _patch_health(updater):
                 self.set_status(200)
                 self.finish("OK")
 
+            def head(self):
+                self.set_status(200)
+                self.finish()
+
         webhook_server = updater.httpd
-        http_server = webhook_server.http_server  # tornado.httpserver.HTTPServer
-        app = http_server.request_callback        # tornado.web.Application
+        http_server = webhook_server.http_server
+        app = http_server.request_callback
 
         app.add_handlers(r".*", [(r"/health", HealthHandler)])
-        logger.info("✅ Ruta /health registrada correctamente")
+        logger.info("✅ Ruta /health registrada (GET + HEAD)")
         return True
 
     except Exception as e:

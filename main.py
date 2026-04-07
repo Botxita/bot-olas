@@ -1,39 +1,14 @@
-"""Entry point principal — Olas Surfer Bot V2.
-
-Soporta dos modos:
-  - polling:  desarrollo local (sin webhook)
-  - webhook:  producción en Render
-
-Variables de entorno requeridas:
-  TELEGRAM_BOT_TOKEN   → obligatorio
-  WEBHOOK_URL          → obligatorio en modo webhook (ej: https://mi-app.onrender.com)
-  PORT                 → puerto para el webhook (Render lo asigna automáticamente)
-
-Variables opcionales:
-  SESSION_DB_PATH      → ruta del SQLite (default: data/sessions.db)
-  FORECAST_CACHE_TTL_SECONDS → TTL del caché (default: 1800)
-  REDIS_URL            → si existe, usa Redis en lugar de in-memory cache
-  ADMIN_USER_IDS       → IDs separados por coma con acceso a /ajuste
-  STORMGLASS_API_KEY   → para usar proveedor Stormglass (futuro)
-  WORLDTIDES_API_KEY   → para usar WorldTides (futuro)
-
-Health check para UptimeRobot:
-  GET https://<WEBHOOK_URL>/health → 200 OK
-  El servidor tornado de PTB v13 se extiende con una ruta extra /health.
-"""
+"""Entry point principal — Olas Surfer Bot V2."""
 
 import logging
 import os
 import sys
-from threading import Thread
-from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from dotenv import load_dotenv
 from telegram.ext import Updater
 
 from bot.handlers.main import register_handlers
 
-# Logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -41,52 +16,74 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Cargar .env
 load_dotenv()
 
 
-class HealthHandler(BaseHTTPRequestHandler):
-    """Responde 200 OK en /health. Render solo expone PORT, así que
-    este servidor corre en PORT+1 internamente — pero UptimeRobot
-    apunta al puerto principal. Ver nota abajo."""
-
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"OK")
-
-    def log_message(self, format, *args):
-        pass
-
-
-def _patch_updater_with_health(updater, health_path: str = "/health"):
+def _patch_health(updater):
     """
-    Agrega una ruta /health al servidor tornado interno de PTB v13.
-    Debe llamarse DESPUÉS de start_webhook().
+    Inyecta /health en el servidor tornado de PTB v13.
+    PTB v13 usa telegram.utils.webhookhandler.WebhookServer,
+    que internamente tiene un atributo `application` (tornado.web.Application).
     """
     try:
         import tornado.web
 
-        class HealthTornadoHandler(tornado.web.RequestHandler):
+        class HealthHandler(tornado.web.RequestHandler):
             def get(self):
                 self.set_status(200)
                 self.finish("OK")
 
-        # El httpd interno del Updater es un tornado HTTPServer
-        # Su application tiene una lista de handlers que podemos extender
-        app = updater.httpd.request_callback  # tornado.web.Application
-        app.add_handlers(r".*", [(r"/health", HealthTornadoHandler)])
-        logger.info("Ruta /health registrada en servidor tornado de PTB")
+        # WebhookServer hereda de tornado.httpserver.HTTPServer
+        # Su aplicación tornado está en ._impl o en .request_callback
+        # Probamos los atributos conocidos de PTB v13
+        webhook_server = updater.httpd  # es un WebhookServer
+
+        # Buscar la tornado.web.Application en el objeto
+        app = None
+        for attr in ["application", "request_callback", "_impl"]:
+            candidate = getattr(webhook_server, attr, None)
+            if candidate is not None and hasattr(candidate, "add_handlers"):
+                app = candidate
+                break
+            # A veces está un nivel más adentro
+            if candidate is not None and hasattr(candidate, "application"):
+                inner = getattr(candidate, "application", None)
+                if inner is not None and hasattr(inner, "add_handlers"):
+                    app = inner
+                    break
+
+        if app is None:
+            # Último recurso: buscar en __dict__ recursivamente
+            def find_app(obj, depth=0):
+                if depth > 3:
+                    return None
+                for v in vars(obj).values():
+                    if hasattr(v, "add_handlers"):
+                        return v
+                    if hasattr(v, "__dict__"):
+                        result = find_app(v, depth + 1)
+                        if result:
+                            return result
+                return None
+            app = find_app(webhook_server)
+
+        if app is None:
+            logger.warning("No se encontró tornado.web.Application en WebhookServer")
+            return False
+
+        app.add_handlers(r".*", [(r"/health", HealthHandler)])
+        logger.info("✅ Ruta /health registrada correctamente")
         return True
+
     except Exception as e:
-        logger.warning("No se pudo parchear tornado con /health: %s", e)
+        logger.warning("No se pudo parchear /health: %s", e)
         return False
 
 
 def main():
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
-        logger.error("TELEGRAM_BOT_TOKEN no configurado. Crear .env basado en .env.example")
+        logger.error("TELEGRAM_BOT_TOKEN no configurado.")
         sys.exit(1)
 
     webhook_url = os.getenv("WEBHOOK_URL", "")
@@ -107,12 +104,14 @@ def main():
             webhook_url=f"{webhook_url}/{token}",
         )
 
-        # Parchear el servidor tornado para agregar /health
-        patched = _patch_updater_with_health(updater)
-        if patched:
-            logger.info("Health check disponible en: %s/health", webhook_url)
-        else:
-            logger.warning("Health check NO disponible — UptimeRobot puede fallar")
+        # Log estructura interna para debug
+        webhook_server = updater.httpd
+        logger.info("WebhookServer type: %s", type(webhook_server))
+        logger.info("WebhookServer attrs: %s", [a for a in dir(webhook_server) if not a.startswith("__")])
+
+        patched = _patch_health(updater)
+        if not patched:
+            logger.warning("⚠️ /health no disponible")
 
         updater.idle()
     else:

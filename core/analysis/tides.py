@@ -155,12 +155,12 @@ def detectar_mareas_del_dia(
         from zoneinfo import ZoneInfo as _ZI
         tz = _ZI("UTC")
 
-    horas_del_dia = [
-        h for h in forecast
+    indices_del_dia = [
+        i for i, h in enumerate(forecast)
         if h.timestamp.astimezone(tz).date() == fecha
     ]
 
-    if not horas_del_dia:
+    if not indices_del_dia:
         return TideAnalysis(
             eventos=[],
             tendencia_actual="sin datos",
@@ -169,7 +169,41 @@ def detectar_mareas_del_dia(
             tiene_extremos_claros=False,
         )
 
-    return detectar_mareas(horas_del_dia, spot=spot)
+    horas_del_dia = [forecast[i] for i in indices_del_dia]
+    resultado = detectar_mareas(horas_del_dia, spot=spot)
+
+    # `_detectar_extremos()` ignora el primer y último índice de la serie
+    # que recibe (necesita ambos vecinos para comparar). Al recortar por
+    # fecha, una marea real en el borde del día (ej. pleamar justo a las
+    # 00:00 local) queda en ese índice 0/n-1 y nunca se evalúa (#14).
+    # Se re-detecta con 2 horas de contexto real a cada lado (si existen en
+    # el forecast completo) y se filtran los eventos resultantes de vuelta
+    # a los que caen dentro de la fecha pedida — nivel_actual, tendencia_actual
+    # y proximo_cambio siguen viniendo de horas_del_dia sin padding, sin
+    # cambios (solo eventos y tiene_extremos_claros se recalculan). 2 horas
+    # (no 1) porque _suavizar() usa ventana=3: con solo 1 hora de contexto,
+    # esa hora de borde queda como índice 0/n-1 de la serie con padding y
+    # recibe su propio ventana parcial (2 puntos en vez de 3) — pudiendo
+    # todavía enmascarar el extremo real que está justo al lado.
+    idx_inicio = max(0, indices_del_dia[0] - 2)
+    idx_fin = min(len(forecast), indices_del_dia[-1] + 3)
+    horas_con_contexto = forecast[idx_inicio:idx_fin]
+    eventos_con_contexto = detectar_mareas(horas_con_contexto, spot=spot).eventos
+    eventos_del_dia = [
+        e for e in eventos_con_contexto
+        if e.timestamp.astimezone(tz).date() == fecha
+    ]
+
+    delta = spot.delta_marea if spot else 0.0
+    niveles_suavizados_dia = _suavizar([h.tide.nivel_m + delta for h in horas_del_dia], ventana=3)
+
+    resultado.eventos = eventos_del_dia
+    resultado.tiene_extremos_claros = (
+        len(eventos_del_dia) >= 1
+        and _amplitud_serie(niveles_suavizados_dia) >= _AMPLITUD_MINIMA_M
+    )
+
+    return resultado
 
 
 # ---------------------------------------------------------------------------

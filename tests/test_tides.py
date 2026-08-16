@@ -362,6 +362,83 @@ def test_detectar_mareas_del_dia_fecha_sin_datos():
     assert result.eventos == []
 
 
+def test_detectar_mareas_del_dia_detecta_extremo_en_borde():
+    """
+    Regresión #14: una pleamar justo en la primera hora del día (00:00
+    local) no debe perderse solo porque _detectar_extremos() ignora el
+    primer/último índice de la serie recortada por fecha. Serie (UTC=local,
+    tz=UTC): 22:00(0.5) 23:00(0.7) [día anterior] 00:00(1.1) 01:00(0.7)
+    [día pedido] 02:00 en adelante plano en 0.5 — pico aislado a la
+    medianoche exacta del día pedido.
+    """
+    spot = make_spot()
+    tz = ZoneInfo("UTC")
+    inicio = datetime(2025, 1, 14, 22, 0, tzinfo=timezone.utc)
+    niveles = [0.5, 0.7, 1.1, 0.7] + [0.5] * 22  # 26 horas: hasta 2025-01-15 23:00
+    forecast = []
+    for i, nivel in enumerate(niveles):
+        ts = inicio + timedelta(hours=i)
+        tide = TideData(nivel_m=nivel, fuente="proxy_msl", es_exacto=False)
+        swell = SwellData(altura_m=1.0, periodo_s=10.0, direccion_deg=180.0)
+        wind = WindData(velocidad_kmh=10.0, rafaga_kmh=15.0, direccion_deg=180.0)
+        forecast.append(ForecastHour(timestamp=ts, swell=swell, wind=wind, tide=tide))
+
+    fecha = date(2025, 1, 15)
+    result = detectar_mareas_del_dia(forecast, fecha, spot=spot, tz=tz)
+
+    altas = [e for e in result.eventos if e.tipo == "alta"]
+    assert len(altas) == 1, f"esperaba 1 pleamar en el borde del día, hubo {len(altas)}"
+    assert altas[0].timestamp == datetime(2025, 1, 15, 0, 0, tzinfo=timezone.utc)
+    assert result.tiene_extremos_claros is True
+
+
+def test_detectar_mareas_del_dia_borde_final_y_filtra_evento_del_dia_siguiente():
+    """
+    Regresión #14 (caso simétrico, borde final del día + verificación del
+    filtro de fecha): un extremo justo en la ÚLTIMA hora del día (23:00
+    local) también se pierde con el recorte simple, igual que a las 00:00.
+    Además hay un segundo extremo genuino un par de horas más tarde (día
+    siguiente, 00:00) que sí se detecta al darle contexto a la búsqueda —
+    pero debe quedar excluido del resultado por el filtro de fecha, y no
+    "colarse" solo porque el propio padding interno también lo detectó.
+    """
+    spot = make_spot()
+    tz = ZoneInfo("UTC")
+    inicio = datetime(2025, 1, 15, 0, 0, tzinfo=timezone.utc)
+    # 26 horas: 2025-01-15 00:00 -> 2025-01-16 01:00. Plano hasta las 21:00,
+    # luego un valle-pico-valle que deja un extremo en el borde del día
+    # (23:00, alta) y otro genuino justo después (día siguiente 00:00, baja).
+    niveles = [0.5] * 22 + [0.2, 0.1, 0.6, 0.1]
+    forecast = []
+    for i, nivel in enumerate(niveles):
+        ts = inicio + timedelta(hours=i)
+        tide = TideData(nivel_m=nivel, fuente="proxy_msl", es_exacto=False)
+        swell = SwellData(altura_m=1.0, periodo_s=10.0, direccion_deg=180.0)
+        wind = WindData(velocidad_kmh=10.0, rafaga_kmh=15.0, direccion_deg=180.0)
+        forecast.append(ForecastHour(timestamp=ts, swell=swell, wind=wind, tide=tide))
+
+    fecha = date(2025, 1, 15)
+
+    # Sanity check: sin filtrar por fecha, el segundo extremo (día
+    # siguiente) sí es detectable en la serie completa — si no lo fuera,
+    # este test no probaría nada sobre el filtro de fecha.
+    deteccion_completa = detectar_mareas(forecast, spot=spot)
+    timestamps_completa = {e.timestamp for e in deteccion_completa.eventos}
+    assert datetime(2025, 1, 16, 0, 0, tzinfo=timezone.utc) in timestamps_completa
+
+    result = detectar_mareas_del_dia(forecast, fecha, spot=spot, tz=tz)
+    timestamps_resultado = {e.timestamp for e in result.eventos}
+
+    # El extremo del borde final del día pedido sí debe aparecer.
+    assert datetime(2025, 1, 15, 23, 0, tzinfo=timezone.utc) in timestamps_resultado
+
+    # El extremo del día siguiente no debe colarse, aunque el padding
+    # interno de detectar_mareas_del_dia() lo haya detectado.
+    assert datetime(2025, 1, 16, 0, 0, tzinfo=timezone.utc) not in timestamps_resultado
+    for evento in result.eventos:
+        assert evento.timestamp.astimezone(tz).date() == fecha
+
+
 # ---------------------------------------------------------------------------
 # Tests de TideEvent
 # ---------------------------------------------------------------------------

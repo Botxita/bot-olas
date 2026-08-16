@@ -153,7 +153,7 @@
         "itamambuca": {
           "nombre": "Itamambuca",
           "ciudad": "Ubatuba",
-          "lat": -23.3340, "lon": -44.8820,
+          "lat": -23.4030, "lon": -45.0060,
           "orientacion_costa_deg": 160, "tolerancia_swell_deg": 35,
           "tipo_break": "beach", "fondo": "arena",
           "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.0, "tipo_efecto": "low_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
@@ -165,9 +165,9 @@
           "tz": "America/Sao_Paulo"
         },
         "maresia": {
-          "nombre": "Maresia",
+          "nombre": "Maresias",
           "ciudad": "São Sebastião",
-          "lat": -23.776, "lon": -45.558,
+          "lat": -23.7915, "lon": -45.5590,
           "orientacion_costa_deg": 160, "tolerancia_swell_deg": 35,
           "tipo_break": "beach", "fondo": "arena",
           "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.1, "tipo_efecto": "low_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},

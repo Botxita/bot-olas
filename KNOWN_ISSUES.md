@@ -2,7 +2,11 @@
 
 Documento vivo de auditoría de fondo sobre `core/` (scoring, analysis, windows) y, desde el hallazgo #32, sobre **calidad de datos geográficos** de `config/spots/*.json`. Generado a partir de una revisión conjunta Claude Code + Codex (auditor independiente, ver `AGENTS.md`).
 
-**Estado (actualizado tras 3 rondas de fixes de código + 1 ronda de auditoría de datos + fixes de datos verificados por Ivan en Google Maps):** de los **55 hallazgos documentados** (31 de código + 24 de datos geográficos), **23 fueron corregidos** — 13 de código en 3 grupos priorizados por Ivan, más 10 de datos geográficos (#33, #34, #41, #43, #44, #46, #47, #48, #49, #53) que Ivan verificó personalmente contra Google Maps antes de aplicar. #45 fue verificado y confirmado que **no** necesita corrección. #36 y #54 fueron investigados pero la evidencia encontrada no fue concluyente (marcados `🔍 VERIFICADO — EVIDENCIA INSUFICIENTE`, distinto de resuelto o sin tocar). Un "grupo confiable" adicional (#32, #37-40, #50, #51 — orientaciones y coordenadas estimadas por Codex, sin verificación cartográfica) está aplicado en el working tree pero **todavía sin commitear**, esperando OK final. El resto (#35, #42, #52, #55) sigue como auditoría sin aplicar — ver advertencia de confiabilidad en esa sección antes de actuar. Los demás hallazgos de código sin marcar (#2, #6-#8, #14-#21, #25-#29, #31) también siguen abiertos.
+**Estado (actualizado tras 3 rondas de fixes de código + 1 ronda de auditoría de datos + 2 rondas de fixes de datos):** de los **55 hallazgos documentados** (31 de código + 24 de datos geográficos), **30 fueron corregidos** — 13 de código en 3 grupos priorizados por Ivan, más 17 de datos geográficos:
+- **10 verificados por Ivan en Google Maps** (la fuente más confiable): #33, #34, #41, #43, #44, #46, #47, #48, #49, #53.
+- **7 del "grupo confiable"** aplicados a partir de estimaciones de Codex (punto medio de rango sugerido, o coordenada estimada), **sin verificación cartográfica** de Ivan: #32, #37, #38, #39, #40, #50, #51 — tratar con más cautela que los 10 anteriores.
+
+#45 fue verificado y confirmado que **no** necesita corrección. #36 y #54 fueron investigados pero la evidencia encontrada no fue concluyente (marcados `🔍 VERIFICADO — EVIDENCIA INSUFICIENTE`, distinto de resuelto o sin tocar; para #36 la orientación sí se corrigió como parte de #40, solo las coordenadas quedaron sin resolver). El resto (#35, #42, #52, #55) sigue como auditoría sin aplicar, sin ninguna acción todavía — ver advertencia de confiabilidad en esa sección antes de actuar. Los demás hallazgos de código sin marcar (#2, #6-#8, #14-#21, #25-#29, #31) también siguen abiertos.
 
 - **Grupo 1** (`fix-grupo1-scoring-critico`): #5, #12, #22.
 - **Grupo 2** (`fix-grupo2-analisis-y-detector`): #1, #3, #4, #11, #23, #24.
@@ -283,6 +287,8 @@ Severidad (distinta a la de `core/`, adaptada a datos geográficos):
 
 ### 32. `cerro_azul` en región `ica`, pero administrativamente es Lima/Cañete — **alta**
 
+**✅ RESUELTO** — aplicado en el mismo commit que esta actualización de KNOWN_ISSUES.md ("grupo confiable"). Región renombrada de `"ica"` a `"canete"` (nombre visible "Cañete (Lima)"), revisado por Codex. `ciudad` sin cambios (ya era correcta).
+
 - Cerro Azul es un distrito de la provincia de Cañete, región **Lima**, no Ica.
 - lat/lon (`-13.0240, -76.4760`) son plausibles para el spot en sí — el problema es solo la región del árbol de navegación del bot.
 - Corrección sugerida por Codex: mover a la región `lima`, o crear una región más precisa (`canete`) dentro de Lima si la organización del bot lo justifica. Ciudad podría ser más específica: "Cerro Azul, Cañete" en vez de solo "Cañete".
@@ -311,21 +317,25 @@ Severidad (distinta a la de `core/`, adaptada a datos geográficos):
 
 ### 36. `pico_alto` — coordenadas demasiado cerca de la costa para un reef break offshore — **media**
 
-**🔍 VERIFICADO — EVIDENCIA INSUFICIENTE PARA CORREGIR.** Ivan investigó en Google Maps pero la búsqueda encontró un hotel llamado "Pico Alto", no el break real — no hay coordenada confiable todavía. Distinto de "resuelto" (nada se aplicó) y de "sin verificar" (sí se investigó, sin resultado utilizable). Sigue con las coordenadas originales de abajo.
+**🔍 COORDENADAS: VERIFICADO — EVIDENCIA INSUFICIENTE.** Ivan investigó en Google Maps pero la búsqueda encontró un hotel llamado "Pico Alto", no el break real — lat/lon siguen siendo las originales de abajo, sin cambios.
+**✅ ORIENTACIÓN: RESUELTA** — `orientacion_costa_deg` 270°→225°, aplicado junto con el resto del cluster Punta Hermosa (ver #40), en el mismo commit que esta actualización de KNOWN_ISSUES.md.
 
 - Pico Alto es una rompiente mar adentro; `-12.3380, -76.8250` parece estar dentro del conjunto urbano/playas de Punta Hermosa, no sobre el pico real. Estimación de Codex: `~-12.33/-12.34, -76.835/-76.84`.
 - `orientacion_costa_deg=270` es dudoso para un reef offshore — su exposición real depende de la geometría del arrecife, no de una costa genérica.
 
 ### 37-39. `chicama`, `huanchaco`, `mancora` — `orientacion_costa_deg` sospechoso de ser valor genérico, no calculado por spot — **alta (si se confirma)**
 
+**✅ RESUELTO** — aplicado en el mismo commit que esta actualización de KNOWN_ISSUES.md ("grupo confiable"), revisado por Codex. `chicama` 280°→235°, `huanchaco` 280°→250°, `mancora` 280°→305°. **Advertencia:** son estimaciones de Codex (punto medio de los rangos sugeridos), sin verificación cartográfica de Ivan — a diferencia de las coordenadas de otros hallazgos, esto no fue chequeado en Google Maps. Confirmado que `_score_dir_swell()` no cambia (domina `direcciones_ideales`, ya poblada en los 59 spots); el efecto real es en `_tipo_viento()`/`score_viento`.
+
 - Los tres comparten un patrón: valores en el rango 280° que no calzan claramente con la exposición real de cada costa según Codex:
   - `chicama` (280°): costa de Puerto Chicama/Malabrigo con exposición predominantemente SW — Codex sugiere rango `220–250°`.
   - `huanchaco` (280°): normal marina local más W/SW — Codex sugiere rango `240–260°`.
   - `mancora` (280°): costa con componente NW clara — Codex sugiere rango `295–315°`.
 - Como `orientacion_costa_deg` alimenta directamente `_score_dir_swell()`/`_tipo_viento()` del motor, un valor mal calibrado cambia recomendaciones reales — por eso alta severidad si se confirma, no solo estética.
-- **No se corrigieron acá** — son estimaciones de Codex sin verificación cartográfica, quedan para revisión conjunta.
 
 ### 40. Grupo Punta Hermosa (`pico_alto`, `caballeros`, `senoritas`, `la_isla`, `el_silencio`) — orientación repetida ~260-270° sin diferenciar geometría real de cada playa/reef — **media**
+
+**✅ RESUELTO** — aplicado en el mismo commit que esta actualización de KNOWN_ISSUES.md ("grupo confiable"), revisado por Codex. Valores diferenciados por spot: `pico_alto` 270°→225°, `caballeros` 270°→235°, `senoritas` 265°→240°, `la_isla` 260°→255°, `el_silencio` 270°→230°. Misma advertencia que #37-39: estimaciones de Codex sin verificación cartográfica — las coordenadas lat/lon de `pico_alto` y `el_silencio` tienen su propio estado por separado (ver #33/#34/#36).
 
 - 5 spots muy cercanos entre sí comparten valores de `orientacion_costa_deg` casi idénticos pese a ser bahías, puntas y reefs con geometría distinta según Codex.
 - No implica que todos estén mal — implica que conviene recalcular cada uno individualmente en vez de asumir que comparten orientación por estar geográficamente cerca.
@@ -395,10 +405,14 @@ Severidad (distinta a la de `core/`, adaptada a datos geográficos):
 
 ### 50. `itamambuca` — coordenadas claramente incorrectas (mar adentro y al norte de Ubatuba) — **media**
 
+**✅ RESUELTO** — aplicado en el mismo commit que esta actualización de KNOWN_ISSUES.md ("grupo confiable"), revisado por Codex. `lat -23.4030, lon -45.0060`. `orientacion_costa_deg=160` sin cambios (Codex confirmó que sigue siendo razonable con el punto corregido). **Advertencia:** estimación de Codex sin verificación cartográfica de Ivan.
+
 - `-23.3340, -44.8820` queda muy al este de la costa de Ubatuba (probablemente mar adentro) y demasiado al norte — el más marcado de los desplazamientos encontrados en Brasil. Estimación de Codex: `~-23.39/-23.41, -45.00/-45.02`.
 - Región y ciudad correctas.
 
 ### 51. `maresia` — nombre no coincide con el nombre oficial del destino, además de coordenada corrida — **baja (nombre) / media (coordenada)**
+
+**✅ RESUELTO** — aplicado en el mismo commit que esta actualización de KNOWN_ISSUES.md ("grupo confiable"), revisado por Codex. `nombre` "Maresia"→"Maresias", `lat -23.7915, lon -45.5590`. `key` deliberadamente **sin cambiar** (sigue `"maresia"`) — riesgo de romper favoritos/ajustes persistidos en SQLite si algún usuario real ya la favoriteó, señalado por Codex; decisión de Ivan fue no arriesgarlo. **Advertencia:** coordenada es estimación de Codex sin verificación cartográfica de Ivan.
 
 - El nombre reconocido del destino es **"Maresias"** (con "s" final), no "Maresia" — afecta tanto `key` como `nombre` en el JSON.
 - Latitud `-23.776` parece algo al norte de la playa principal — Codex estima `~-23.79, -45.56`. Longitud plausible.

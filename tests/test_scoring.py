@@ -46,6 +46,7 @@ def make_spot(
     tolerancia=45,
     marea_min=0.4,
     marea_max=1.6,
+    marea_tipo_efecto="mid_better",
     direcciones_ideales=None,
 ) -> SpotConfig:
     return SpotConfig(
@@ -62,7 +63,7 @@ def make_spot(
         fondo="arena",
         marea_min_m=marea_min,
         marea_max_m=marea_max,
-        marea_tipo_efecto="mid_better",
+        marea_tipo_efecto=marea_tipo_efecto,
         swell_altura_min=0.5,
         swell_altura_max=3.0,
         swell_periodo_min=7.0,
@@ -249,6 +250,85 @@ class TestMarea(unittest.TestCase):
         spot = make_spot(marea_min=0.4, marea_max=1.6)
         tide = TideData(nivel_m=10.0)
         self.assertGreaterEqual(_score_marea(tide, spot), 0.0)
+
+    def test_mid_better_simetrico_alrededor_del_centro(self):
+        """Comportamiento por default (sin cambios): mejor en el centro."""
+        spot = make_spot(marea_min=0.4, marea_max=1.6, marea_tipo_efecto="mid_better")
+        centro = _score_marea(TideData(nivel_m=1.0), spot)
+        borde_bajo = _score_marea(TideData(nivel_m=0.4), spot)
+        borde_alto = _score_marea(TideData(nivel_m=1.6), spot)
+        self.assertGreater(centro, borde_bajo)
+        self.assertGreater(centro, borde_alto)
+        self.assertAlmostEqual(borde_bajo, borde_alto, delta=0.001)
+
+    def test_low_better_mejor_en_marea_baja(self):
+        """
+        Regresión #1: un spot low_better debe puntuar mejor con marea baja
+        que con marea alta dentro del rango — hoy (antes del fix) puntuaban
+        igual porque el score era simétrico al centro sin importar el tipo.
+        """
+        spot = make_spot(marea_min=0.3, marea_max=1.4, marea_tipo_efecto="low_better")
+        s_baja = _score_marea(TideData(nivel_m=0.3), spot)   # marea_min_m
+        s_centro = _score_marea(TideData(nivel_m=0.85), spot)
+        s_alta = _score_marea(TideData(nivel_m=1.4), spot)   # marea_max_m
+        self.assertGreater(s_baja, s_centro)
+        self.assertGreater(s_centro, s_alta)
+        self.assertAlmostEqual(s_baja, 1.0, delta=0.001)
+
+    def test_high_better_mejor_en_marea_alta(self):
+        """Simétrico al caso low_better, pero favoreciendo marea alta."""
+        spot = make_spot(marea_min=0.3, marea_max=1.4, marea_tipo_efecto="high_better")
+        s_baja = _score_marea(TideData(nivel_m=0.3), spot)
+        s_centro = _score_marea(TideData(nivel_m=0.85), spot)
+        s_alta = _score_marea(TideData(nivel_m=1.4), spot)
+        self.assertGreater(s_alta, s_centro)
+        self.assertGreater(s_centro, s_baja)
+        self.assertAlmostEqual(s_alta, 1.0, delta=0.001)
+
+    def test_low_better_fuera_de_rango_hacia_abajo_no_penaliza(self):
+        """
+        Regresión #1 (parte 2): _generar_flags() marca una marea por debajo
+        de marea_min_m en un spot low_better como flag POSITIVO ("bueno
+        aquí"), no neutro/negativo. El score debe ser consistente con eso:
+        no penalizar esa dirección, igual que en el borde marea_min_m.
+        """
+        spot = make_spot(marea_min=0.4, marea_max=1.6, marea_tipo_efecto="low_better")
+        s_en_el_borde = _score_marea(TideData(nivel_m=0.4), spot)
+        s_mas_abajo = _score_marea(TideData(nivel_m=0.1), spot)
+        s_mucho_mas_abajo = _score_marea(TideData(nivel_m=-0.5), spot)
+        self.assertAlmostEqual(s_en_el_borde, 1.0, delta=0.001)
+        self.assertAlmostEqual(s_mas_abajo, 1.0, delta=0.001)
+        self.assertAlmostEqual(s_mucho_mas_abajo, 1.0, delta=0.001)
+
+    def test_low_better_fuera_de_rango_hacia_arriba_si_penaliza(self):
+        """La dirección opuesta (marea alta) en un spot low_better sigue
+        penalizada — solo se exime la dirección que el flag marca como buena."""
+        spot = make_spot(marea_min=0.4, marea_max=1.6, marea_tipo_efecto="low_better")
+        s_en_el_borde = _score_marea(TideData(nivel_m=1.6), spot)
+        s_mas_arriba = _score_marea(TideData(nivel_m=3.0), spot)
+        self.assertLess(s_mas_arriba, s_en_el_borde)
+
+    def test_high_better_fuera_de_rango_hacia_arriba_no_penaliza(self):
+        """Simétrico: high_better no penaliza marea por encima de marea_max_m."""
+        spot = make_spot(marea_min=0.4, marea_max=1.6, marea_tipo_efecto="high_better")
+        s_en_el_borde = _score_marea(TideData(nivel_m=1.6), spot)
+        s_mas_arriba = _score_marea(TideData(nivel_m=3.0), spot)
+        self.assertAlmostEqual(s_en_el_borde, 1.0, delta=0.001)
+        self.assertAlmostEqual(s_mas_arriba, 1.0, delta=0.001)
+
+    def test_high_better_fuera_de_rango_hacia_abajo_si_penaliza(self):
+        spot = make_spot(marea_min=0.4, marea_max=1.6, marea_tipo_efecto="high_better")
+        s_en_el_borde = _score_marea(TideData(nivel_m=0.4), spot)
+        s_mas_abajo = _score_marea(TideData(nivel_m=-1.0), spot)
+        self.assertLess(s_mas_abajo, s_en_el_borde)
+
+    def test_mid_better_fuera_de_rango_penaliza_ambos_lados(self):
+        """mid_better (default, sin cambios): ninguna dirección se exime."""
+        spot = make_spot(marea_min=0.4, marea_max=1.6, marea_tipo_efecto="mid_better")
+        s_abajo = _score_marea(TideData(nivel_m=0.0), spot)
+        s_arriba = _score_marea(TideData(nivel_m=2.0), spot)
+        self.assertLess(s_abajo, 1.0)
+        self.assertLess(s_arriba, 1.0)
 
 
 # ------------------------------------------------------------------

@@ -196,6 +196,21 @@ def _score_marea(tide: TideData, spot: SpotConfig) -> float:
     """
     Penalización gradual cuando la marea se aleja del rango óptimo del spot.
 
+    Dentro del rango [marea_min_m, marea_max_m], la forma de la curva depende
+    de spot.marea_tipo_efecto:
+      - "mid_better" (default): mejor en el centro del rango, decae hacia
+        ambos bordes por igual.
+      - "low_better": mejor en marea_min_m, decae monótonamente hacia
+        marea_max_m (spots que solo funcionan con marea baja).
+      - "high_better": mejor en marea_max_m, decae monótonamente hacia
+        marea_min_m.
+    Fuera del rango, la desviación en la dirección PREFERIDA por tipo_efecto
+    (más baja para low_better, más alta para high_better) no se penaliza —
+    consistente con _generar_flags(), que ya marca esos casos como flag
+    positivo ("Marea baja/alta, bueno aquí") en vez de neutro. La desviación
+    en la dirección opuesta usa la misma penalización por distancia absoluta
+    de siempre (la escala de esa penalización es el hallazgo #7, no este fix).
+
     Nota: sea_level_height_msl es proxy, no datum náutico.
     La calibración por spot (delta_altura en ajustes) permite ajustar empíricamente.
     """
@@ -209,14 +224,30 @@ def _score_marea(tide: TideData, spot: SpotConfig) -> float:
         return 0.7  # Configuración incompleta, score neutro
 
     if mn <= nivel <= mx:
-        # Dentro del rango: bonus por estar cerca del centro
-        distancia_centro = abs(nivel - centro)
-        return 1.0 - 0.20 * (distancia_centro / amplitud)
+        tipo = spot.marea_tipo_efecto
+        if tipo == "low_better":
+            # Máximo en marea_min_m, decae linealmente hacia marea_max_m.
+            progreso = (nivel - mn) / (mx - mn)
+            return 1.0 - 0.20 * progreso
+        elif tipo == "high_better":
+            # Máximo en marea_max_m, decae linealmente hacia marea_min_m.
+            progreso = (mx - nivel) / (mx - mn)
+            return 1.0 - 0.20 * progreso
+        else:
+            # mid_better: bonus por estar cerca del centro
+            distancia_centro = abs(nivel - centro)
+            return 1.0 - 0.20 * (distancia_centro / amplitud)
     else:
-        # Fuera del rango: penalización gradual
+        # Fuera del rango: penalización gradual, salvo que la desviación
+        # vaya en la dirección que tipo_efecto ya marca como buena.
+        tipo = spot.marea_tipo_efecto
         if nivel < mn:
+            if tipo == "low_better":
+                return 1.0  # Sigue siendo "bueno aquí" (ver _generar_flags)
             desvio = mn - nivel
         else:
+            if tipo == "high_better":
+                return 1.0  # Sigue siendo "bueno aquí" (ver _generar_flags)
             desvio = nivel - mx
         # Penalización capped: no llega a 0 (la marea sigue siendo surfeeable)
         return max(0.10, 1.0 - desvio * 0.50)

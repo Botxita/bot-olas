@@ -55,6 +55,7 @@ def make_spot(
     viento_max_offshore=35.0,
     viento_max_onshore=15.0,
     swell_altura_max=3.0,
+    delta_altura=0.0,
 ) -> SpotConfig:
     return SpotConfig(
         key="test_varese",
@@ -77,6 +78,7 @@ def make_spot(
         viento_max_offshore=viento_max_offshore,
         viento_max_onshore=viento_max_onshore,
         direcciones_ideales=direcciones_ideales or [],
+        delta_altura=delta_altura,
     )
 
 
@@ -471,6 +473,33 @@ class TestScoreTotal(unittest.TestCase):
         s_reef = calcular_score(hour_windchop, reef)
         # Reef da más peso al período → score más bajo con windchop
         self.assertLessEqual(s_reef.score_100, s_beach.score_100 + 5)
+
+    def test_altura_ajustada_negativa_no_da_energia_falsa(self):
+        """
+        Regresión #9: delta_altura negativo mayor que la altura real no
+        debe convertirse en energía positiva falsa al elevar al cuadrado
+        (H²) — debe clampearse a piso 0.0 (ola inexistente), no
+        comportarse como si fuera una ola grande real.
+        """
+        spot = make_spot(delta_altura=-1.0)
+        hour = make_hour(altura=0.2, periodo=10, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0)
+        bd = calcular_score(hour, spot)
+
+        self.assertEqual(bd.energia_proxy, 0.0)
+        self.assertAlmostEqual(bd.score_energia, 0.0, delta=0.01)
+
+    def test_delta_altura_positivo_normal_sigue_funcionando(self):
+        """Un delta_altura positivo normal (calibración típica) no debe
+        verse afectado por el clamp — solo el caso negativo-y-mayor cambia."""
+        spot_ajustado = make_spot(delta_altura=0.3)
+        spot_base = make_spot(delta_altura=0.0)
+        hour = make_hour(altura=1.0, periodo=12, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0)
+
+        bd_ajustado = calcular_score(hour, spot_ajustado)
+        bd_base = calcular_score(hour, spot_base)
+
+        # Con delta_altura=+0.3, la altura efectiva es mayor → más energía, no menos.
+        self.assertGreater(bd_ajustado.energia_proxy, bd_base.energia_proxy)
 
     def test_periodo_min_alto_coherente_entre_score_y_flags(self):
         """

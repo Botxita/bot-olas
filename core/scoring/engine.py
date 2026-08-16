@@ -421,9 +421,13 @@ def calcular_score(hour: ForecastHour, spot: SpotConfig) -> ScoreBreakdown:
     pesos = weights["pesos_por_break"].get(spot.tipo_break, weights["pesos_por_break"]["beach"])
     escala_energia = weights["energia"]["escala_normalizacion"]
 
-    # Aplicar ajustes locales del spot
+    # Aplicar ajustes locales del spot. altura_m se clampea a piso 0.0:
+    # un delta_altura negativo mayor que la altura real puede dar un
+    # resultado negativo, y _energia_proxy (H²) pierde el signo al elevar
+    # al cuadrado — una config de calibración rota terminaba puntuando
+    # como si fuera una ola grande real en vez de "0m, sin ola".
     swell_ajustado = SwellData(
-        altura_m=hour.swell.altura_m + spot.delta_altura,
+        altura_m=max(0.0, hour.swell.altura_m + spot.delta_altura),
         periodo_s=hour.swell.periodo_s * spot.factor_periodo,
         direccion_deg=hour.swell.direccion_deg,
         altura_viento_m=hour.swell.altura_viento_m,

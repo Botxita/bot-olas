@@ -64,7 +64,7 @@
         "el_silencio": {
           "nombre": "El Silencio",
           "ciudad": "Punta Hermosa",
-          "lat": -12.3500, "lon": -76.8310,
+          "lat": -12.31561, "lon": -76.83615,
           "orientacion_costa_deg": 270, "tolerancia_swell_deg": 45,
           "tipo_break": "beach", "fondo": "arena",
           "marea": {"rango_optimo_min_m": 0.4, "rango_optimo_max_m": 1.5, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
@@ -78,7 +78,7 @@
         "punta_rocas": {
           "nombre": "Punta Rocas",
           "ciudad": "Punta Negra",
-          "lat": -12.3010, "lon": -76.8060,
+          "lat": -12.354237, "lon": -76.811514,
           "orientacion_costa_deg": 270, "tolerancia_swell_deg": 35,
           "tipo_break": "reef", "fondo": "roca",
           "marea": {"rango_optimo_min_m": 0.5, "rango_optimo_max_m": 1.5, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},

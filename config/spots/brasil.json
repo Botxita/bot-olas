@@ -78,7 +78,7 @@
         "silveira": {
           "nombre": "Silveira",
           "ciudad": "Garopaba",
-          "lat": -28.0950, "lon": -48.6350,
+          "lat": -28.036951, "lon": -48.607447,
           "orientacion_costa_deg": 120, "tolerancia_swell_deg": 35,
           "tipo_break": "beach", "fondo": "arena",
           "marea": {"rango_optimo_min_m": 0.2, "rango_optimo_max_m": 1.0, "tipo_efecto": "low_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},

@@ -22,7 +22,7 @@
         "las_machas": {
           "nombre": "Las Machas",
           "ciudad": "Arica",
-          "lat": -18.4870, "lon": -70.3410,
+          "lat": -18.4456, "lon": -70.3039,
           "orientacion_costa_deg": 265, "tolerancia_swell_deg": 40,
           "tipo_break": "beach", "fondo": "arena",
           "marea": {"rango_optimo_min_m": 0.2, "rango_optimo_max_m": 1.0, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
@@ -101,8 +101,8 @@
         },
         "la_boca_matanzas": {
           "nombre": "La Boca (Matanzas)",
-          "ciudad": "Matanzas",
-          "lat": -33.9610, "lon": -71.8710,
+          "ciudad": "Navidad",
+          "lat": -33.924223, "lon": -71.849743,
           "orientacion_costa_deg": 260, "tolerancia_swell_deg": 35,
           "tipo_break": "beach", "fondo": "arena",
           "marea": {"rango_optimo_min_m": 0.3, "rango_optimo_max_m": 1.4, "tipo_efecto": "low_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},

@@ -2,7 +2,7 @@
 
 Documento vivo de auditoría de fondo sobre `core/` (scoring, analysis, windows) y, desde el hallazgo #32, sobre **calidad de datos geográficos** de `config/spots/*.json`. Generado a partir de una revisión conjunta Claude Code + Codex (auditor independiente, ver `AGENTS.md`).
 
-**Estado (actualizado tras 3 rondas de fixes de código + 1 ronda de auditoría de datos):** de los **55 hallazgos documentados** (31 de código + 24 de datos geográficos), **13 fueron corregidos** en 3 grupos de código priorizados por Ivan — cada uno marcado `✅ RESUELTO` con su commit. Los hallazgos #32-#55 (datos geográficos) son **auditoría pura, todavía sin decidir qué se corrige** — ver advertencia de confiabilidad en esa sección antes de actuar. Los demás hallazgos de código sin marcar (#2, #6-#8, #14-#21, #25-#29, #31) también siguen abiertos.
+**Estado (actualizado tras 3 rondas de fixes de código + 1 ronda de auditoría de datos + primera tanda de fixes de datos verificados):** de los **55 hallazgos documentados** (31 de código + 24 de datos geográficos), **18 fueron corregidos** — 13 de código en 3 grupos priorizados por Ivan, más 5 de datos geográficos (#33, #34, #41, #44, #47) que Ivan verificó personalmente contra Google Maps antes de aplicar. #45 fue verificado y confirmado que **no** necesita corrección. El resto de #32-#55 (18 hallazgos: #32, #35-40, #42-43, #46, #48-55) sigue como auditoría sin aplicar — ver advertencia de confiabilidad en esa sección antes de actuar, la mayoría son estimaciones de Codex sin verificación cartográfica. Los demás hallazgos de código sin marcar (#2, #6-#8, #14-#21, #25-#29, #31) también siguen abiertos.
 
 - **Grupo 1** (`fix-grupo1-scoring-critico`): #5, #12, #22.
 - **Grupo 2** (`fix-grupo2-analisis-y-detector`): #1, #3, #4, #11, #23, #24.
@@ -290,11 +290,15 @@ Severidad (distinta a la de `core/`, adaptada a datos geográficos):
 
 ### 33. `punta_rocas` — coordenadas corresponden al cluster de Punta Hermosa, no a Punta Rocas — **media**
 
+**✅ RESUELTO (coordenadas)** — commit `804ef02`. Ivan verificó contra Google Maps: `lat -12.354237, lon -76.811514`. `orientacion_costa_deg` sigue sin tocar (pendiente, ver #40).
+
 - `-12.3010, -76.8060` cae en el entorno de Punta Hermosa/norte de Punta Hermosa, no en Punta Rocas (Punta Negra), que está más al sur — estimación de Codex: `~-12.36, -76.79/-76.80`.
 - La ciudad (`Punta Negra`) y la región (`lima`) sí son correctas — solo el punto exacto está mal.
 - `orientacion_costa_deg=270` debería recalcularse después de corregir el punto (posiblemente más WSW/SW).
 
 ### 34. `el_silencio` — coordenadas corresponden a otro punto del cluster Punta Hermosa — **media**
+
+**✅ RESUELTO (coordenadas)** — commit `804ef02`. Ivan verificó contra Google Maps: `lat -12.31561, lon -76.83615`. `orientacion_costa_deg` sigue sin tocar (pendiente, ver #40).
 
 - `-12.3500, -76.8310` queda al norte/oeste de donde está realmente Playa El Silencio — estimación de Codex: `~-12.37, -76.80`.
 - Región y referencia a Punta Hermosa correctas.
@@ -328,6 +332,8 @@ Severidad (distinta a la de `core/`, adaptada a datos geográficos):
 
 ### 41. `las_machas` — coordenadas ubicadas al sur de donde está la playa real — **media**
 
+**✅ RESUELTO** — commit `804ef02`. Ivan verificó contra Google Maps: `lat -18.4456, lon -70.3039`.
+
 - `-18.4870, -70.3410` cae junto al conjunto El Laucho/La Lisera/Isla Alacrán, no en Las Machas (que está al norte de Arica, continuando desde Chinchorro). Estimación de Codex: `~-18.42/-18.44, -70.32/-70.33`.
 - Región (Arica y Parinacota) correcta.
 
@@ -338,15 +344,21 @@ Severidad (distinta a la de `core/`, adaptada a datos geográficos):
 
 ### 43. `punta_de_lobos` — longitud parece mar adentro — **media**
 
+**🔲 SIGUE PENDIENTE** — Ivan no lo verificó todavía (a diferencia de los demás de este archivo). No tocar sin confirmación directa en Maps.
+
 - `lon=-72.0833` ubicaría el punto varios km mar adentro; Codex estima la rompiente/promontorio real en `~-34.43, -72.04/-72.05`.
 - Latitud, región y ciudad correctas — Codex no marca `orientacion_costa_deg=260` como sospechoso acá.
 
 ### 44. `la_boca_matanzas` — coordenadas/nombre corresponden a Matanzas en general, no específicamente a "La Boca" — **baja/media**
 
+**✅ RESUELTO (coordenadas + ciudad)** — commit `804ef02`. Ivan verificó contra Google Maps y confirmó explícitamente que el spot representa "La Boca", Navidad, O'Higgins específicamente (no una fusión con Matanzas): `lat -33.924223, lon -71.849743`, `ciudad` corregida de "Matanzas" a "Navidad". Codex señaló que el `nombre` visible "La Boca (Matanzas)" queda ahora semánticamente confuso con `ciudad=Navidad` — sugerencia pendiente de decisión: renombrar a "La Boca (Navidad)" o solo "La Boca".
+
 - `-33.9610, -71.8710` corresponde mejor a Matanzas propiamente que al sector "La Boca" (junto a la desembocadura), que está más al norte — estimación de Codex: `~-33.95, -71.86/-71.87`.
 - Alternativa planteada por Codex: si se prefiere conservar la coordenada actual, el nombre debería simplificarse a "Matanzas" en vez de "La Boca (Matanzas)".
 
 ### 45. `pichilemu_infiernillo` — sospechoso, longitud posiblemente corrida al este; nombre ambiguo — **baja (sin confirmar)**
+
+**✅ VERIFICADO — SIN CAMBIOS NECESARIOS.** Ivan lo chequeó contra Google Maps: la diferencia es menor a 1km, y confirmó que "Infiernillo" es un lugar real y distinto de Punta de Lobos, no un nombre fusionado por error. No se toca.
 
 - `-34.3870, -72.0090` podría estar algo al este de la rompiente real de Infiernillo — Codex estima `~-72.013/-72.016`, pero lo marca como "requiere mapa", no alta confianza.
 - Nombre compuesto "Pichilemu / Infiernillo" es ambiguo — si la coordenada representa la rompiente de Infiernillo específicamente, convendría llamarlo solo "Infiernillo".
@@ -358,6 +370,8 @@ Severidad (distinta a la de `core/`, adaptada a datos geográficos):
 - `-28.1000, -48.6400` cae en el entorno Ouvidor/Rosa norte, no en la barra de la Lagoa de Ibiraquera (que está al sur de Praia do Rosa). Estimación de Codex: `~-28.15/-28.16, -48.64/-48.66`.
 
 ### 47. `silveira` — latitud no respeta el orden geográfico real del cluster Garopaba/Imbituba — **media**
+
+**✅ RESUELTO** — commit `804ef02`. Ivan verificó contra Google Maps: `lat -28.036951, lon -48.607447`.
 
 - `-28.0950, -48.6350` cae en el entorno Ouvidor/Rosa norte, no en Praia da Silveira (inmediatamente al sur de Garopaba Central, al norte de Ferrugem). Estimación de Codex: `~-28.04/-28.05, -48.61/-48.63`.
 - Codex lo marca como "el error más claro de posible copia o intercambio" dentro del cluster — la secuencia norte-sur real es Garopaba → Silveira → Ferrugem → Ouvidor → Rosa → Ibiraquera, y la coordenada actual de `silveira` no respeta esa secuencia.

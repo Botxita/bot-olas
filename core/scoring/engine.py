@@ -183,15 +183,17 @@ def _score_dir_swell(diff: float, tolerancia: float) -> float:
         # Dentro de la ventana óptima: bonus por ser más centrado
         return 1.0 - 0.15 * (diff / tolerancia)
 
-    elif diff <= tolerancia * 2.5:
-        # Zona de transición: decae linealmente
-        exceso = diff - tolerancia
-        rango = tolerancia * 1.5
-        return 0.85 - 0.65 * (exceso / rango)
-
-    else:
-        # Swell muy oblicuo o de espaldas
-        return max(0.05, 0.20 - 0.003 * diff)
+    # Fuera de la ventana óptima: decae linealmente desde 0.85 (el valor
+    # exacto en diff==tolerancia, que empalma con la rama de arriba) hasta
+    # el piso 0.05, que ahora emerge naturalmente del propio max() en vez
+    # de ser una rama aparte con una fórmula sin relación a `tolerancia`.
+    # Antes había una tercera rama ("diff > 2.5*tolerancia") con una curva
+    # distinta y desconectada de esta, que producía un salto de 0.20 a
+    # 0.05 exactamente en diff==2.5*tolerancia (regresión #6) — se fusiona
+    # todo en una sola fórmula continua.
+    exceso = diff - tolerancia
+    rango = tolerancia * 1.5
+    return max(0.05, 0.85 - 0.65 * (exceso / rango))
 
 
 # ---------------------------------------------------------------------------

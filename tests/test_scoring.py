@@ -244,6 +244,42 @@ class TestDireccionSwell(unittest.TestCase):
         self.assertGreaterEqual(s, 0.0)
         self.assertLessEqual(s, 1.0)
 
+    def test_continuidad_en_el_viejo_borde_2_5x_tolerancia(self):
+        """
+        Regresión #6: antes había un salto de 0.20 a 0.05 justo en
+        diff == 2.5*tolerancia (dos ramas con fórmulas sin relación entre
+        sí). Ahora es una sola curva continua — un desvío mínimo cerca de
+        ese punto no debe cambiar el score de forma abrupta.
+        """
+        tolerancia = 45
+        borde = tolerancia * 2.5
+        s_en_el_borde = _score_dir_swell(diff=borde, tolerancia=tolerancia)
+        s_justo_despues = _score_dir_swell(diff=borde + 0.1, tolerancia=tolerancia)
+        self.assertAlmostEqual(s_en_el_borde, 0.20, delta=0.01)
+        self.assertAlmostEqual(s_en_el_borde, s_justo_despues, delta=0.01)
+
+    def test_piso_005_en_diff_extremo(self):
+        """Un swell de espaldas (diff=180) sigue tocando el piso 0.05."""
+        s = _score_dir_swell(diff=180, tolerancia=45)
+        self.assertAlmostEqual(s, 0.05, delta=0.001)
+
+    def test_monotono_decreciente_fuera_de_tolerancia(self):
+        """
+        Invariante de la curva nueva: el score no debe subir en ningún punto
+        a medida que diff crece más allá de tolerancia. No es una regresión
+        de la implementación vieja (esa también era decreciente, solo con
+        un salto abrupto en 2.5*tolerancia en vez de una curva continua) —
+        es una propiedad que la fórmula fusionada debe seguir cumpliendo.
+        """
+        tolerancia = 45
+        diffs = [tolerancia, tolerancia * 1.5, tolerancia * 2, tolerancia * 2.5, tolerancia * 3, 180]
+        scores = [_score_dir_swell(diff=d, tolerancia=tolerancia) for d in diffs]
+        for i in range(1, len(scores)):
+            self.assertLessEqual(
+                scores[i], scores[i - 1],
+                f"score subió de {scores[i-1]} (diff={diffs[i-1]}) a {scores[i]} (diff={diffs[i]})",
+            )
+
     def test_tolerancia_cero_diff_cero_coherente_con_flag(self):
         """Integración vía calcular_score(): tolerancia=0 con alineación
         perfecta debe dar score 1.0 Y flag positivo — coherentes entre sí."""

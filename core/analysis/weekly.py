@@ -14,7 +14,12 @@ from typing import List, Optional, Tuple
 
 from core.scoring.models import ForecastHour, SpotConfig
 from core.analysis.daylight import get_daylight, is_daylight
-from core.analysis.best_hour import BestHourResult, calcular_mejor_hora
+from core.analysis.best_hour import (
+    BestHourResult,
+    calcular_mejor_hora_detallado,
+    MOTIVO_FALLO_SOLAR,
+    MOTIVO_SCORING_FALLO,
+)
 
 
 @dataclass
@@ -26,7 +31,8 @@ class DayScore:
     score_100: int             # score_promedio * 100
     mejor_hora: Optional[BestHourResult]
     horas_con_luz: int         # cantidad de horas diurnas evaluadas
-    tiene_datos: bool          # False si no había forecast para ese día
+    tiene_datos: bool          # False si no se pudo calcular una mejor hora
+    motivo_sin_datos: Optional[str] = None  # por qué, cuando tiene_datos=False (#16, ver best_hour.MOTIVO_*)
 
     @property
     def es_bueno(self) -> bool:
@@ -120,6 +126,24 @@ def analizar_semana(
     # Filtrar días con datos para calcular mejor/peor
     dias_con_datos = [d for d in scores_por_dia if d.tiene_datos]
     if not dias_con_datos:
+        # Ningún día terminó con datos. Puede ser un estado normal de
+        # disponibilidad (MOTIVO_SIN_FORECAST — inalcanzable acá, ver abajo
+        # — o MOTIVO_SOLO_NOCTURNO_O_PASADO: un forecast corto que solo
+        # cubre horas nocturnas o bloques de hoy ya pasados) o un fallo
+        # técnico real (MOTIVO_FALLO_SOLAR, MOTIVO_SCORING_FALLO). Solo el
+        # segundo grupo amerita propagar una excepción — mismo criterio que
+        # core/windows/detector.py (#23): un fallo sistémico se propaga en
+        # vez de degradar en silencio, pero "no hay nada utilizable" sigue
+        # siendo un None normal, no un error. bot/handlers/main.py ya
+        # envuelve analizar_semana() en un try/except genérico que muestra
+        # un mensaje legible cuando sí se propaga.
+        motivos = {d.motivo_sin_datos for d in scores_por_dia if d.motivo_sin_datos}
+        motivos_error = motivos & {MOTIVO_FALLO_SOLAR, MOTIVO_SCORING_FALLO}
+        if motivos_error:
+            raise RuntimeError(
+                f"No se pudo calcular ningún día de la semana para el spot '{spot.key}' "
+                f"— motivo(s): {', '.join(sorted(motivos_error))}."
+            )
         return None
 
     mejor_dia = max(dias_con_datos, key=lambda d: d.score_promedio)
@@ -151,7 +175,7 @@ def _analizar_dia(
 
     # Calcular mejor hora (que internamente filtra por luz, por horas ya
     # pasadas si 'fecha' es hoy, y calcula scores)
-    mejor_hora = calcular_mejor_hora(forecast, spot, fecha, score_fn=score_fn, ahora=ahora)
+    mejor_hora, motivo = calcular_mejor_hora_detallado(forecast, spot, fecha, score_fn=score_fn, ahora=ahora)
 
     if mejor_hora is None:
         return DayScore(
@@ -162,6 +186,7 @@ def _analizar_dia(
             mejor_hora=None,
             horas_con_luz=0,
             tiene_datos=False,
+            motivo_sin_datos=motivo,
         )
 
     # Calcular promedio usando todas las horas diurnas del ranking

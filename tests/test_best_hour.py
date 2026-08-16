@@ -21,11 +21,18 @@ from core.scoring.models import (
     ForecastHour, SwellData, WindData, TideData,
     ScoreBreakdown, SpotConfig,
 )
+from unittest.mock import patch
+
 from core.analysis.best_hour import (
     calcular_mejor_hora,
+    calcular_mejor_hora_detallado,
     calcular_ranking_dia,
     BestHourResult,
     RankedHour,
+    MOTIVO_SIN_FORECAST,
+    MOTIVO_SOLO_NOCTURNO_O_PASADO,
+    MOTIVO_FALLO_SOLAR,
+    MOTIVO_SCORING_FALLO,
 )
 
 
@@ -351,6 +358,81 @@ def test_mejor_hora_timezone_costa_rica():
         ahora=ahora_antes_del_amanecer(fecha, tz_str="America/Costa_Rica"),
     )
     assert result is not None
+
+
+# ---------------------------------------------------------------------------
+# Tests de calcular_mejor_hora_detallado (#16 — distinguir los motivos
+# detrás de "no hay mejor hora", antes todos colapsaban en un mismo None)
+# ---------------------------------------------------------------------------
+
+def test_detallado_sin_forecast_para_la_fecha():
+    """Ninguna hora del forecast corresponde a la fecha pedida."""
+    forecast = make_forecast_dia(FECHA_TEST)
+    fecha_diferente = date(2025, 1, 20)
+    sf = mock_score_fn(scores_dict_from_forecast(forecast))
+    result, motivo = calcular_mejor_hora_detallado(forecast, SPOT_MDQ, fecha_diferente, score_fn=sf)
+    assert result is None
+    assert motivo == MOTIVO_SIN_FORECAST
+
+
+def test_detallado_solo_horas_nocturnas():
+    """Hay forecast para la fecha, pero ninguna hora cae en luz solar vigente."""
+    tz = ZoneInfo("America/Argentina/Buenos_Aires")
+    medianoche = datetime(FECHA_TEST.year, FECHA_TEST.month, FECHA_TEST.day, 0, 0, tzinfo=tz)
+    horas_madrugada = [medianoche + timedelta(hours=h) for h in (1, 2, 3)]
+    forecast = [make_hour(dt.astimezone(timezone.utc), score_override=0.9) for dt in horas_madrugada]
+    sf = mock_score_fn(scores_dict_from_forecast(forecast))
+
+    result, motivo = calcular_mejor_hora_detallado(
+        forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf, ahora=AHORA_TEST,
+    )
+    assert result is None
+    assert motivo == MOTIVO_SOLO_NOCTURNO_O_PASADO
+
+
+def test_detallado_fallo_solar():
+    """get_daylight() lanza ValueError (fenómeno polar) -> motivo específico, no confundido con 'sin datos'."""
+    forecast = make_forecast_dia(FECHA_TEST)
+    sf = mock_score_fn(scores_dict_from_forecast(forecast))
+    with patch("core.analysis.best_hour.get_daylight", side_effect=ValueError("polar")):
+        result, motivo = calcular_mejor_hora_detallado(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf, ahora=AHORA_TEST)
+    assert result is None
+    assert motivo == MOTIVO_FALLO_SOLAR
+
+
+def test_detallado_scoring_fallo_para_todas_las_horas():
+    """
+    Regresión #16: si score_fn lanza excepción para TODAS las horas diurnas
+    vigentes, el motivo debe distinguirse de "no había horas que evaluar" —
+    antes ambos casos daban el mismo None sin forma de diferenciarlos.
+    """
+    forecast = make_forecast_dia(FECHA_TEST, scores_por_hora={8: 0.8, 10: 0.9})
+
+    def score_fn_roto(hour, spot):
+        raise RuntimeError("config de spot rota")
+
+    result, motivo = calcular_mejor_hora_detallado(
+        forecast, SPOT_MDQ, FECHA_TEST, score_fn=score_fn_roto, ahora=AHORA_TEST,
+    )
+    assert result is None
+    assert motivo == MOTIVO_SCORING_FALLO
+
+
+def test_detallado_motivo_none_cuando_hay_resultado():
+    """Cuando sí hay mejor hora, motivo debe ser None."""
+    forecast = make_forecast_dia(FECHA_TEST, scores_por_hora={8: 0.8, 10: 0.9, 14: 0.6})
+    sf = mock_score_fn(scores_dict_from_forecast(forecast))
+    result, motivo = calcular_mejor_hora_detallado(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf, ahora=AHORA_TEST)
+    assert result is not None
+    assert motivo is None
+
+
+def test_calcular_mejor_hora_sigue_retornando_solo_el_resultado():
+    """calcular_mejor_hora() (API pública original) no cambia su firma ni comportamiento."""
+    forecast = make_forecast_dia(FECHA_TEST, scores_por_hora={8: 0.8, 10: 0.9})
+    sf = mock_score_fn(scores_dict_from_forecast(forecast))
+    result = calcular_mejor_hora(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf, ahora=AHORA_TEST)
+    assert isinstance(result, BestHourResult)
 
 
 # ---------------------------------------------------------------------------

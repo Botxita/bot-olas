@@ -9,6 +9,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import math
+import pytest
 from datetime import date, datetime, timezone, timedelta
 from typing import List
 from zoneinfo import ZoneInfo
@@ -415,6 +416,104 @@ def test_weekly_tiene_datos_false_para_dia_sin_forecast():
     # Solo los 2 primeros días deben tener datos
     dias_con = [d for d in result.scores_por_dia if d.tiene_datos]
     assert len(dias_con) == 2
+
+
+def test_weekly_scoring_fallido_para_todos_los_dias_propaga_excepcion():
+    """
+    Regresión #16 (caso raíz del hallazgo original): si score_fn falla para
+    TODAS las horas de TODOS los días con forecast disponible (ej. config
+    de spot rota), analizar_semana() no debe degradar en silencio a un
+    None genérico indistinguible de "no hay pronóstico" — se propaga como
+    RuntimeError, mismo criterio que core/windows/detector.py (#23) para
+    fallos sistémicos de scoring. bot/handlers/main.py ya envuelve
+    analizar_semana() en un try/except genérico, así que esto no rompe
+    el flujo real, solo el resultado observable deja de ser un None mudo.
+    """
+    forecast = make_forecast_dias(FECHA, 3)
+
+    def score_fn_roto(hour, spot):
+        raise RuntimeError("config de spot rota")
+
+    tz = ZoneInfo("America/Argentina/Buenos_Aires")
+    ahora = datetime(FECHA.year, FECHA.month, FECHA.day, 12, 0, tzinfo=tz).astimezone(timezone.utc)
+
+    with pytest.raises(RuntimeError, match="scoring_fallo"):
+        analizar_semana(forecast, SPOT, score_fn=score_fn_roto, ahora=ahora)
+
+
+def test_weekly_semana_completa_nocturna_no_propaga_excepcion():
+    """
+    MOTIVO_SOLO_NOCTURNO_O_PASADO es un estado normal de disponibilidad
+    (forecast corto que solo cubre horas nocturnas), no un fallo técnico —
+    a diferencia del test anterior, si TODOS los días de la semana quedan
+    sin datos por este motivo, analizar_semana() debe seguir devolviendo
+    None como antes de #16, no una excepción.
+    """
+    tz = ZoneInfo("America/Argentina/Buenos_Aires")
+    medianoche = datetime(FECHA.year, FECHA.month, FECHA.day, 0, 0, tzinfo=tz)
+    horas_madrugada = [medianoche + timedelta(hours=h) for h in (1, 2, 3)]
+    forecast = []
+    for dt in horas_madrugada:
+        h = ForecastHour(
+            timestamp=dt.astimezone(timezone.utc),
+            swell=SwellData(altura_m=1.5, periodo_s=12.0, direccion_deg=95.0),
+            wind=WindData(velocidad_kmh=15.0, rafaga_kmh=20.0, direccion_deg=180.0),
+            tide=TideData(nivel_m=0.8, fuente="proxy_msl"),
+        )
+        h._test_score = 0.9
+        forecast.append(h)
+    sf = mock_score_fn(scores_dict(forecast))
+
+    result = analizar_semana(forecast, SPOT, score_fn=sf, ahora=medianoche.astimezone(timezone.utc))
+    assert result is None
+
+
+def test_weekly_motivo_sin_datos_solo_nocturno():
+    """
+    Regresión #16: un día cuyo forecast es exclusivamente nocturno debe
+    quedar con motivo_sin_datos=MOTIVO_SOLO_NOCTURNO_O_PASADO — distinguible
+    de un día con datos reales, que debe tener motivo_sin_datos=None. 'ahora'
+    inyectado para no depender del reloj real (mismo patrón que
+    test_weekly_excluye_horas_pasadas_de_hoy).
+
+    Nota: fechas_disponibles (weekly.py) solo incluye fechas que ya tienen
+    al menos una hora de forecast, así que MOTIVO_SIN_FORECAST nunca se
+    produce a través de analizar_semana() — solo es alcanzable llamando
+    calcular_mejor_hora_detallado() directamente con una fecha ausente del
+    forecast (cubierto en test_best_hour.py).
+    """
+    from core.analysis.best_hour import MOTIVO_SOLO_NOCTURNO_O_PASADO
+
+    tz = ZoneInfo("America/Argentina/Buenos_Aires")
+    medianoche = datetime(FECHA.year, FECHA.month, FECHA.day, 0, 0, tzinfo=tz)
+    horas_madrugada = [medianoche + timedelta(hours=h) for h in (1, 2, 3)]
+    forecast_noche = []
+    for dt in horas_madrugada:
+        h = ForecastHour(
+            timestamp=dt.astimezone(timezone.utc),
+            swell=SwellData(altura_m=1.5, periodo_s=12.0, direccion_deg=95.0),
+            wind=WindData(velocidad_kmh=15.0, rafaga_kmh=20.0, direccion_deg=180.0),
+            tide=TideData(nivel_m=0.8, fuente="proxy_msl"),
+        )
+        h._test_score = 0.9
+        forecast_noche.append(h)
+
+    fecha_dia2 = FECHA + timedelta(days=1)
+    forecast_dia2 = make_forecast_dias(fecha_dia2, 1, scores_por_hora={12: 0.7})
+
+    forecast = forecast_noche + forecast_dia2
+    sf = mock_score_fn(scores_dict(forecast))
+
+    result = analizar_semana(forecast, SPOT, score_fn=sf, ahora=medianoche.astimezone(timezone.utc))
+    assert result is not None
+
+    dia1 = next(d for d in result.scores_por_dia if d.fecha == FECHA)
+    dia2 = next(d for d in result.scores_por_dia if d.fecha == fecha_dia2)
+
+    assert dia1.tiene_datos is False
+    assert dia1.motivo_sin_datos == MOTIVO_SOLO_NOCTURNO_O_PASADO
+    assert dia2.tiene_datos is True
+    assert dia2.motivo_sin_datos is None
 
 
 def test_weekly_spot_en_resultado():

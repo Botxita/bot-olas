@@ -15,6 +15,16 @@ from core.scoring.models import ForecastHour, ScoreBreakdown, SpotConfig
 from core.analysis.daylight import DaylightInfo, get_daylight, is_daylight
 
 
+# Motivos por los que calcular_mejor_hora_detallado() puede no encontrar
+# una mejor hora — antes todos colapsaban en el mismo `None` (#16),
+# perdiendo la distinción entre "no hay nada que mostrar" (sin_forecast,
+# solo_nocturno_o_pasado) y "algo falló" (fallo_solar, scoring_fallo).
+MOTIVO_SIN_FORECAST = "sin_forecast"                    # no hay ninguna hora de forecast para esa fecha
+MOTIVO_SOLO_NOCTURNO_O_PASADO = "solo_nocturno_o_pasado"  # hay forecast, pero ninguna hora es diurna y vigente
+MOTIVO_FALLO_SOLAR = "fallo_solar"                       # get_daylight() lanzó ValueError (fenómeno polar)
+MOTIVO_SCORING_FALLO = "scoring_fallo"                   # había horas diurnas vigentes, pero score_fn falló para todas
+
+
 @dataclass
 class RankedHour:
     """Una hora del día con su score y posición en el ranking."""
@@ -68,8 +78,37 @@ def calcular_mejor_hora(
         BestHourResult con la mejor hora, o None si no hay datos.
     """
     score_fn = score_fn or _default_score_fn()
+    resultado, _motivo = _calcular_mejor_hora_interno(forecast, spot, fecha, score_fn, ahora)
+    return resultado
+
+
+def calcular_mejor_hora_detallado(
+    forecast: List[ForecastHour],
+    spot: SpotConfig,
+    fecha: date,
+    score_fn=None,
+    ahora: Optional[datetime] = None,
+) -> Tuple[Optional[BestHourResult], Optional[str]]:
+    """
+    Igual que calcular_mejor_hora(), pero cuando no hay resultado también
+    retorna el motivo — distingue los 4 estados que antes colapsaban en el
+    mismo None (#16): MOTIVO_SIN_FORECAST, MOTIVO_SOLO_NOCTURNO_O_PASADO,
+    MOTIVO_FALLO_SOLAR o MOTIVO_SCORING_FALLO. Motivo es None solo cuando
+    sí hay resultado.
+    """
+    score_fn = score_fn or _default_score_fn()
+    return _calcular_mejor_hora_interno(forecast, spot, fecha, score_fn, ahora)
+
+
+def _calcular_mejor_hora_interno(
+    forecast: List[ForecastHour],
+    spot: SpotConfig,
+    fecha: date,
+    score_fn,
+    ahora: Optional[datetime],
+) -> Tuple[Optional[BestHourResult], Optional[str]]:
     if score_fn is None:
-        return None
+        return None, None
 
     tz = spot.get_zoneinfo()
 
@@ -78,13 +117,18 @@ def calcular_mejor_hora(
         daylight = get_daylight(spot, fecha)
     except ValueError:
         # Fenómeno polar extremo — no debería ocurrir para LATAM
-        return None
+        return None, MOTIVO_FALLO_SOLAR
+
+    ahora = ahora if ahora is not None else datetime.now(timezone.utc)
+
+    hay_forecast_para_fecha = any(
+        h.timestamp.astimezone(tz).date() == fecha for h in forecast
+    )
 
     # Filtrar horas del día con luz solar que todavía no terminaron.
     # Cada ForecastHour representa un bloque de 1h (mismo criterio que
     # core/windows/detector.py) — se considera "todavía vigente" mientras
     # su fin (timestamp + 1h) no haya pasado, no solo su inicio.
-    ahora = ahora if ahora is not None else datetime.now(timezone.utc)
     horas_del_dia = [
         h for h in forecast
         if h.timestamp.astimezone(tz).date() == fecha
@@ -93,7 +137,9 @@ def calcular_mejor_hora(
     ]
 
     if not horas_del_dia:
-        return None
+        if not hay_forecast_para_fecha:
+            return None, MOTIVO_SIN_FORECAST
+        return None, MOTIVO_SOLO_NOCTURNO_O_PASADO
 
     # Calcular score para cada hora
     scored: List[Tuple[ForecastHour, ScoreBreakdown]] = []
@@ -105,7 +151,7 @@ def calcular_mejor_hora(
             continue
 
     if not scored:
-        return None
+        return None, MOTIVO_SCORING_FALLO
 
     # Ordenar por score descendente
     scored.sort(key=lambda x: x[1].score_total, reverse=True)
@@ -118,7 +164,7 @@ def calcular_mejor_hora(
 
     best_hour, best_breakdown = scored[0]
 
-    return BestHourResult(
+    resultado = BestHourResult(
         hour=best_hour,
         breakdown=best_breakdown,
         score_100=best_breakdown.score_100,
@@ -127,6 +173,7 @@ def calcular_mejor_hora(
         daylight=daylight,
         todas_las_horas=ranked,
     )
+    return resultado, None
 
 
 def calcular_ranking_dia(

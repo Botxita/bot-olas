@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from core.scoring.engine import (
     _energia_proxy,
+    _factor_tamano,
     _score_periodo,
     _score_dir_swell,
     _score_viento,
@@ -51,6 +52,7 @@ def make_spot(
     swell_periodo_min=7.0,
     viento_max_offshore=35.0,
     viento_max_onshore=15.0,
+    swell_altura_max=3.0,
 ) -> SpotConfig:
     return SpotConfig(
         key="test_varese",
@@ -68,7 +70,7 @@ def make_spot(
         marea_max_m=marea_max,
         marea_tipo_efecto=marea_tipo_efecto,
         swell_altura_min=0.5,
-        swell_altura_max=3.0,
+        swell_altura_max=swell_altura_max,
         swell_periodo_min=swell_periodo_min,
         viento_max_offshore=viento_max_offshore,
         viento_max_onshore=viento_max_onshore,
@@ -129,6 +131,25 @@ class TestEnergia(unittest.TestCase):
         self.assertGreaterEqual(_score_energia(0), 0.0)
         self.assertLessEqual(_score_energia(1000), 1.0)  # no supera 1
         self.assertGreater(_score_energia(50), _score_energia(10))  # monótona
+
+    def test_factor_tamano_no_penaliza_dentro_del_maximo(self):
+        self.assertEqual(_factor_tamano(1.0, altura_max=2.0), 1.0)
+        self.assertEqual(_factor_tamano(2.0, altura_max=2.0), 1.0)  # justo en el máximo
+
+    def test_factor_tamano_penaliza_gradualmente_por_encima(self):
+        """Regresión #4: a más exceso sobre el máximo del spot, más penalización."""
+        f_poco = _factor_tamano(2.5, altura_max=2.0)   # 25% de exceso
+        f_mucho = _factor_tamano(4.0, altura_max=2.0)  # 100% de exceso
+        self.assertLess(f_mucho, f_poco)
+        self.assertLess(f_poco, 1.0)
+
+    def test_factor_tamano_no_llega_a_cero(self):
+        f = _factor_tamano(20.0, altura_max=2.0)  # exceso extremo
+        self.assertGreaterEqual(f, 0.3)
+
+    def test_factor_tamano_maneja_maximo_cero_sin_crashear(self):
+        """Config incompleta (altura_max=0) no debe dividir por cero."""
+        self.assertEqual(_factor_tamano(1.0, altura_max=0.0), 1.0)
 
 
 class TestPeriodo(unittest.TestCase):
@@ -468,6 +489,71 @@ class TestScoreTotal(unittest.TestCase):
             any("corto" in f or "windchop" in f for f in bd.flags_negativos),
             f"Esperaba un flag negativo de período corto/windchop, flags: {bd.flags_negativos}",
         )
+
+    def test_ola_por_encima_del_maximo_no_sigue_subiendo_el_score(self):
+        """
+        Regresión #4: antes, una ola más grande que swell_altura_max seguía
+        aumentando el score de energía sin límite (solo se avisaba con un
+        flag). Reproduce el ejemplo de KNOWN_ISSUES.md: spot con máximo 2m,
+        período 12s — 4m (el doble del máximo) debe puntuar peor que 2m
+        (justo en el máximo), no mejor.
+        """
+        spot = make_spot(swell_altura_max=2.0)
+        hour_en_el_maximo = make_hour(altura=2.0, periodo=12, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0)
+        hour_muy_grande = make_hour(altura=4.0, periodo=12, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0)
+
+        bd_en_el_maximo = calcular_score(hour_en_el_maximo, spot)
+        bd_muy_grande = calcular_score(hour_muy_grande, spot)
+
+        self.assertLess(bd_muy_grande.score_energia, bd_en_el_maximo.score_energia)
+
+    def test_borde_exacto_vs_apenas_por_encima(self):
+        """
+        Regresión #4 (hallazgo de Codex): justo en el máximo (2.0m) vs.
+        apenas por encima (2.1m) — el score no debe subir. Con solo el
+        factor multiplicativo sin recortar la base, tanh todavía crecía más
+        rápido que lo que decaía el factor lineal en esta zona.
+        """
+        spot = make_spot(swell_altura_max=2.0)
+        hour_en_el_maximo = make_hour(altura=2.0, periodo=6, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0)
+        hour_apenas_encima = make_hour(altura=2.1, periodo=6, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0)
+
+        bd_en_el_maximo = calcular_score(hour_en_el_maximo, spot)
+        bd_apenas_encima = calcular_score(hour_apenas_encima, spot)
+
+        self.assertLessEqual(bd_apenas_encima.score_energia, bd_en_el_maximo.score_energia)
+
+    def test_periodo_corto_sin_saturacion_de_tanh(self):
+        """
+        Caso real señalado por Codex: máximo 2m, período 6s (periodo_min
+        bajo real en config/spots) — con T corto el tanh está lejos de
+        saturar, la zona donde el bug original era más severo.
+        """
+        spot = make_spot(swell_altura_max=2.0)
+        hour_en_el_maximo = make_hour(altura=2.0, periodo=6, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0)
+        hour_50pct_exceso = make_hour(altura=3.0, periodo=6, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0)
+
+        bd_en_el_maximo = calcular_score(hour_en_el_maximo, spot)
+        bd_50pct_exceso = calcular_score(hour_50pct_exceso, spot)
+
+        self.assertLess(bd_50pct_exceso.score_energia, bd_en_el_maximo.score_energia)
+
+    def test_monotonicidad_no_creciente_por_encima_del_maximo(self):
+        """El score de energía no debe subir en ningún punto a medida que
+        la altura crece más allá del máximo del spot."""
+        spot = make_spot(swell_altura_max=2.0)
+        alturas = [2.0, 2.1, 2.3, 2.5, 3.0, 4.0, 6.0]
+        scores = []
+        for altura in alturas:
+            hour = make_hour(altura=altura, periodo=6, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0)
+            scores.append(calcular_score(hour, spot).score_energia)
+
+        for i in range(1, len(scores)):
+            self.assertLessEqual(
+                scores[i], scores[i - 1],
+                f"score_energia subió de {scores[i-1]} (altura={alturas[i-1]}) a "
+                f"{scores[i]} (altura={alturas[i]})",
+            )
 
     def test_viento_max_offshore_bajo_coherente_entre_score_y_flags(self):
         """Un spot expuesto (viento_max_offshore=20) con offshore de 18 km/h

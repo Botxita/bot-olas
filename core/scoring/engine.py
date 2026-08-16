@@ -56,6 +56,34 @@ def _score_energia(energia: float, escala: float = 50.0) -> float:
     return float(math.tanh(ratio * 1.2))
 
 
+def _factor_tamano(altura_m: float, altura_max: float) -> float:
+    """
+    Factor multiplicativo que penaliza gradualmente cuando la ola supera
+    swell_altura_max del spot (config/spots/*.json).
+
+    Antes, superar el máximo configurado solo disparaba un flag de
+    advertencia ("Ola grande para el spot") — el score de energía seguía
+    subiendo con altura² sin límite, premiando numéricamente una condición
+    que el propio spot marca como excesiva/peligrosa.
+
+    Se usa junto con una base de energía recortada a altura_max (ver
+    calcular_score) — este factor por sí solo NO garantiza que el score no
+    siga subiendo cerca del máximo (tanh todavía crece ahí más rápido que
+    lo que este factor decae); la base recortada es la que congela ese
+    crecimiento, y este factor decae desde ese punto congelado.
+
+    Devuelve 1.0 (sin penalizar) hasta altura_max inclusive. Más allá,
+    decae linealmente relativo al propio altura_max del spot (el mismo
+    exceso absoluto pesa más en un spot chico que en uno que ya tolera
+    olas grandes), con piso en 0.3 — no llega a 0, sigue siendo "surfeable"
+    aunque grande para el spot.
+    """
+    if altura_max <= 0 or altura_m <= altura_max:
+        return 1.0
+    exceso = altura_m - altura_max
+    return max(0.3, 1.0 - (exceso / altura_max))
+
+
 # ---------------------------------------------------------------------------
 # Capa 2 — Período
 # ---------------------------------------------------------------------------
@@ -402,8 +430,24 @@ def calcular_score(hour: ForecastHour, spot: SpotConfig) -> ScoreBreakdown:
     )
 
     # Calcular sub-scores
-    energia = _energia_proxy(swell_ajustado)
-    s_energia = _score_energia(energia, escala_energia)
+    energia = _energia_proxy(swell_ajustado)  # H²×T crudo, para debug/display — sin cambios
+
+    # Score de energía: la BASE se calcula con la altura recortada a
+    # swell_altura_max (congela el crecimiento del tanh más allá del
+    # máximo del spot), y el factor de tamaño decae desde ahí. Multiplicar
+    # el factor directamente sobre el score sin recortar la base no alcanza:
+    # cerca del máximo, tanh todavía crece más rápido que lo que decae el
+    # factor lineal, y una ola apenas por encima del máximo podía seguir
+    # puntuando más que una justo en el máximo.
+    altura_max = spot.swell_altura_max
+    if altura_max > 0:
+        altura_para_score = min(swell_ajustado.altura_m, altura_max)
+    else:
+        altura_para_score = swell_ajustado.altura_m
+    energia_para_score = (altura_para_score ** 2) * swell_ajustado.periodo_s
+    s_energia = _score_energia(energia_para_score, escala_energia)
+    s_energia *= _factor_tamano(swell_ajustado.altura_m, altura_max)
+
     s_periodo = _score_periodo(swell_ajustado.periodo_s, spot.swell_periodo_min)
     diff_dir = _mejor_diff_direccion(swell_ajustado.direccion_deg, spot)
     s_dir = _score_dir_swell(diff_dir, spot.tolerancia_swell_deg)

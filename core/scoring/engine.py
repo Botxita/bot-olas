@@ -292,7 +292,7 @@ def _score_marea(tide: TideData, spot: SpotConfig) -> float:
     de siempre (la escala de esa penalización es el hallazgo #7, no este fix).
 
     Nota: sea_level_height_msl es proxy, no datum náutico.
-    La calibración por spot (delta_altura en ajustes) permite ajustar empíricamente.
+    La calibración por spot (delta_marea en ajustes) permite ajustar empíricamente.
     """
     nivel = tide.nivel_m
     mn = spot.marea_min_m
@@ -329,8 +329,15 @@ def _score_marea(tide: TideData, spot: SpotConfig) -> float:
             if tipo == "high_better":
                 return 1.0  # Sigue siendo "bueno aquí" (ver _generar_flags)
             desvio = nivel - mx
+        # Arranca en 0.80 (el valor exacto que da la rama "dentro del rango"
+        # en el borde correspondiente a la dirección PENALIZADA — mid_better
+        # da 0.80 en ambos bordes; low_better da 0.80 en mx (mn ya devolvió
+        # 1.0 arriba); high_better da 0.80 en mn (mx ya devolvió 1.0 arriba)
+        # — nunca en 1.0. Antes, un desvío de una milésima de metro saltaba
+        # de 0.80 a ~1.00 de golpe (regresión #2) porque esta rama ignoraba
+        # el valor del borde y siempre empezaba a decaer desde el máximo.
         # Penalización capped: no llega a 0 (la marea sigue siendo surfeeable)
-        return max(0.10, 1.0 - desvio * 0.50)
+        return max(0.10, 0.80 - desvio * 0.50)
 
 
 # ---------------------------------------------------------------------------

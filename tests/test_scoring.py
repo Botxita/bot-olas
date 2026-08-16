@@ -485,6 +485,45 @@ class TestMarea(unittest.TestCase):
         s_mas_abajo = _score_marea(TideData(nivel_m=-1.0), spot)
         self.assertLess(s_mas_abajo, s_en_el_borde)
 
+    def test_continuidad_en_el_borde_mid_better(self):
+        """
+        Regresión #2: justo en marea_min/marea_max el score interior da
+        0.80 (borde), y un desvío infinitesimal hacia afuera NO debe saltar
+        a ~1.00 — debe seguir cerca de 0.80, decayendo suavemente desde ahí.
+        """
+        spot = make_spot(marea_min=0.4, marea_max=1.6, marea_tipo_efecto="mid_better")
+        epsilon = 0.001
+
+        s_borde_bajo = _score_marea(TideData(nivel_m=0.4), spot)
+        s_justo_afuera_bajo = _score_marea(TideData(nivel_m=0.4 - epsilon), spot)
+        self.assertAlmostEqual(s_borde_bajo, 0.80, delta=0.001)
+        self.assertAlmostEqual(s_borde_bajo, s_justo_afuera_bajo, delta=0.01)
+
+        s_borde_alto = _score_marea(TideData(nivel_m=1.6), spot)
+        s_justo_afuera_alto = _score_marea(TideData(nivel_m=1.6 + epsilon), spot)
+        self.assertAlmostEqual(s_borde_alto, 0.80, delta=0.001)
+        self.assertAlmostEqual(s_borde_alto, s_justo_afuera_alto, delta=0.01)
+
+    def test_continuidad_en_el_borde_low_better_direccion_penalizada(self):
+        """Misma continuidad, pero en la dirección que sí se penaliza
+        (hacia marea_max_m) para un spot low_better."""
+        spot = make_spot(marea_min=0.4, marea_max=1.6, marea_tipo_efecto="low_better")
+        epsilon = 0.001
+        s_borde = _score_marea(TideData(nivel_m=1.6), spot)
+        s_justo_afuera = _score_marea(TideData(nivel_m=1.6 + epsilon), spot)
+        self.assertAlmostEqual(s_borde, 0.80, delta=0.001)
+        self.assertAlmostEqual(s_borde, s_justo_afuera, delta=0.01)
+
+    def test_continuidad_en_el_borde_high_better_direccion_penalizada(self):
+        """Misma continuidad, dirección penalizada (hacia marea_min_m) para
+        un spot high_better."""
+        spot = make_spot(marea_min=0.4, marea_max=1.6, marea_tipo_efecto="high_better")
+        epsilon = 0.001
+        s_borde = _score_marea(TideData(nivel_m=0.4), spot)
+        s_justo_afuera = _score_marea(TideData(nivel_m=0.4 - epsilon), spot)
+        self.assertAlmostEqual(s_borde, 0.80, delta=0.001)
+        self.assertAlmostEqual(s_borde, s_justo_afuera, delta=0.01)
+
     def test_mid_better_fuera_de_rango_penaliza_ambos_lados(self):
         """mid_better (default, sin cambios): ninguna dirección se exime."""
         spot = make_spot(marea_min=0.4, marea_max=1.6, marea_tipo_efecto="mid_better")

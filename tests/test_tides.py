@@ -177,6 +177,62 @@ def test_amplitud_serie_vacia():
 
 
 # ---------------------------------------------------------------------------
+# Tests de _detectar_extremos — mesetas
+# ---------------------------------------------------------------------------
+
+def test_detectar_extremos_meseta_de_2_horas():
+    """
+    Regresión #15: una meseta de 2 horas en pleamar (mismo valor suavizado
+    dos horas seguidas) debe detectarse como un único evento — antes,
+    `curr > next` fallaba porque `next` era igual, no menor, y la pleamar
+    completa se perdía.
+    """
+    inicio = datetime(2025, 1, 15, 0, 0, tzinfo=timezone.utc)
+    niveles = [0.50, 0.80, 0.80, 0.50]
+    timestamps = [inicio + timedelta(hours=i) for i in range(len(niveles))]
+    eventos = _detectar_extremos(timestamps, niveles, niveles)
+    assert len(eventos) == 1
+    assert eventos[0].tipo == "alta"
+    assert eventos[0].nivel_m == 0.80
+    # Punto medio de la meseta (índices 1,2), redondeado hacia abajo -> índice 1
+    assert eventos[0].timestamp == inicio + timedelta(hours=1)
+
+
+def test_detectar_extremos_meseta_larga_bajamar():
+    """Meseta de 4 horas en bajamar también se agrupa en un único evento."""
+    inicio = datetime(2025, 1, 15, 0, 0, tzinfo=timezone.utc)
+    niveles = [1.0, 0.2, 0.2, 0.2, 0.2, 1.0]
+    timestamps = [inicio + timedelta(hours=i) for i in range(len(niveles))]
+    eventos = _detectar_extremos(timestamps, niveles, niveles)
+    assert len(eventos) == 1
+    assert eventos[0].tipo == "baja"
+    # Meseta en índices 1..4, punto medio redondeado hacia abajo -> índice 2
+    assert eventos[0].timestamp == inicio + timedelta(hours=2)
+
+
+def test_detectar_extremos_meseta_que_toca_el_borde_no_se_detecta():
+    """
+    Una meseta que se extiende hasta el borde de la serie (índice 0) no
+    tiene vecino real de ese lado para comparar — igual que un punto
+    aislado en el borde, se descarta (comportamiento heredado, no nuevo).
+    """
+    inicio = datetime(2025, 1, 15, 0, 0, tzinfo=timezone.utc)
+    niveles = [0.80, 0.80, 0.80, 0.50]  # meseta pegada al borde izquierdo
+    timestamps = [inicio + timedelta(hours=i) for i in range(len(niveles))]
+    eventos = _detectar_extremos(timestamps, niveles, niveles)
+    assert eventos == []
+
+
+def test_detectar_extremos_no_detecta_serie_plana():
+    """Serie completamente plana: no hay extremos, sin importar la longitud."""
+    inicio = datetime(2025, 1, 15, 0, 0, tzinfo=timezone.utc)
+    niveles = [0.5] * 10
+    timestamps = [inicio + timedelta(hours=i) for i in range(len(niveles))]
+    eventos = _detectar_extremos(timestamps, niveles, niveles)
+    assert eventos == []
+
+
+# ---------------------------------------------------------------------------
 # Tests de detectar_mareas — serie senoidal
 # ---------------------------------------------------------------------------
 

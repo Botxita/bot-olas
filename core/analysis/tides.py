@@ -230,29 +230,48 @@ def _detectar_extremos(
     """
     Detecta máximos y mínimos locales usando ventana de 3 puntos.
     Usa el nivel suavizado para detectar, pero reporta el nivel original.
+
+    Agrupa mesetas — 2+ horas consecutivas con exactamente el mismo valor
+    suavizado — como un único extremo si ese valor es estrictamente mayor
+    (o menor) que ambos vecinos inmediatos fuera de la meseta. Antes,
+    comparar cada punto contra sus vecinos por separado hacía que ningún
+    elemento de una meseta calificara (`curr > next` fallaba porque `next`
+    era igual, no menor), perdiendo pleamares/bajamares de 2+ horas por
+    completo (#15). El evento se reporta en el punto medio de la meseta
+    (redondeado hacia abajo) — con muestreo horario no hay forma de saber
+    en qué instante exacto dentro de la meseta ocurrió el extremo real.
     """
     eventos = []
     n = len(niveles_suavizados)
 
-    for i in range(1, n - 1):
-        prev_ = niveles_suavizados[i - 1]
+    i = 1
+    while i < n - 1:
         curr = niveles_suavizados[i]
-        next_ = niveles_suavizados[i + 1]
+
+        fin = i
+        while fin + 1 <= n - 2 and niveles_suavizados[fin + 1] == curr:
+            fin += 1
+
+        prev_ = niveles_suavizados[i - 1]
+        next_ = niveles_suavizados[fin + 1]
+        idx_evento = i + (fin - i) // 2
 
         if curr > prev_ and curr > next_:
             eventos.append(TideEvent(
-                timestamp=timestamps[i],
-                nivel_m=round(niveles_originales[i], 3),
+                timestamp=timestamps[idx_evento],
+                nivel_m=round(niveles_originales[idx_evento], 3),
                 tipo="alta",
                 es_estimado=True,
             ))
         elif curr < prev_ and curr < next_:
             eventos.append(TideEvent(
-                timestamp=timestamps[i],
-                nivel_m=round(niveles_originales[i], 3),
+                timestamp=timestamps[idx_evento],
+                nivel_m=round(niveles_originales[idx_evento], 3),
                 tipo="baja",
                 es_estimado=True,
             ))
+
+        i = fin + 1
 
     return eventos
 

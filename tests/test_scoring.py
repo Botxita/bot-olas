@@ -223,6 +223,51 @@ class TestDireccionSwell(unittest.TestCase):
         diff = _angulo_relativo(275, 95)
         self.assertAlmostEqual(diff, 180.0, delta=1.0)
 
+    def test_tolerancia_cero_alineacion_perfecta_no_crashea(self):
+        """
+        Regresión #10: tolerancia_swell_deg=0 con diff=0 calculaba 0/0
+        (ZeroDivisionError) en la rama de bonus. Ningún spot real usa esto
+        (rango real 30°-60°), pero el registry no valida positividad.
+        """
+        s = _score_dir_swell(diff=0, tolerancia=0)
+        self.assertEqual(s, 1.0)
+
+    def test_tolerancia_cero_no_alineado_no_crashea(self):
+        """Con tolerancia=0 y diff>0, debe usar la curva de 'muy oblicuo'
+        directamente (no hay ventana de bonus posible con tolerancia 0)."""
+        s = _score_dir_swell(diff=30, tolerancia=0)
+        self.assertAlmostEqual(s, 0.11, delta=0.001)  # 0.20 - 0.003*30
+
+    def test_tolerancia_negativa_no_crashea(self):
+        """Tolerancia negativa (config claramente rota) tampoco debe crashear."""
+        s = _score_dir_swell(diff=10, tolerancia=-5)
+        self.assertGreaterEqual(s, 0.0)
+        self.assertLessEqual(s, 1.0)
+
+    def test_tolerancia_cero_diff_cero_coherente_con_flag(self):
+        """Integración vía calcular_score(): tolerancia=0 con alineación
+        perfecta debe dar score 1.0 Y flag positivo — coherentes entre sí."""
+        spot = make_spot(orientacion=95, tolerancia=0)
+        hour = make_hour(altura=1.2, periodo=12, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0)
+        bd = calcular_score(hour, spot)
+        self.assertEqual(bd.score_dir_swell, 1.0)
+        self.assertIn("Dirección swell ideal", bd.flags_positivos)
+
+    def test_tolerancia_negativa_coherente_con_flag(self):
+        """
+        Regresión #10 (parte 2, hallazgo de Codex): con tolerancia negativa,
+        ni siquiera una alineación perfecta (diff=0) debe dar score 1.0 con
+        un flag negativo al mismo tiempo. _generar_flags() ya trata TODO
+        diff como oblicuo cuando la tolerancia es negativa (diff <=
+        tolerancia nunca es cierto para un diff real, que siempre es >=0),
+        así que el score debe coincidir con esa misma lectura.
+        """
+        spot = make_spot(orientacion=95, tolerancia=-5)
+        hour = make_hour(altura=1.2, periodo=12, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0)
+        bd = calcular_score(hour, spot)
+        self.assertLess(bd.score_dir_swell, 0.5)
+        self.assertIn("Swell oblicuo al spot", bd.flags_negativos)
+
     def test_direccion_ideal_de_la_lista_distinta_de_orientacion(self):
         """Con direcciones_ideales configuradas, un swell que coincide con
         una de ellas (no con orientacion_costa_deg) debe dar diff=0."""

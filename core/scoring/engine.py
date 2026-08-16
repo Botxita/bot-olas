@@ -162,6 +162,23 @@ def _score_dir_swell(diff: float, tolerancia: float) -> float:
     `diff` es la diferencia angular ya calculada contra el ideal más cercano
     (ver `_mejor_diff_direccion`).
     """
+    if tolerancia <= 0:
+        # Config inválida (tolerancia_swell_deg=0 o negativa — ninguno de
+        # los 59 spots reales usa esto, rango real 30°-60°, pero el registry
+        # no valida positividad). Sin tolerancia<=0 no hay ventana de bonus
+        # que calcular (evita la división por cero de diff/tolerancia más
+        # abajo). Solo tolerancia==0 con alineación exacta cuenta como
+        # "perfecta" — coincide con _generar_flags(), que también usa
+        # `diff <= spot.tolerancia_swell_deg` para el flag positivo, así que
+        # con tolerancia==0 ambos coinciden en diff<=0. Con tolerancia
+        # NEGATIVA esa comparación (diff <= tolerancia) nunca es verdadera
+        # para un diff real (siempre >=0), así que el flag ya trata TODO
+        # como oblicuo — acá hacemos lo mismo (sin excepción para diff==0)
+        # para no puntuar 1.0 con un flag negativo al mismo tiempo.
+        if tolerancia == 0 and diff <= 0:
+            return 1.0
+        return max(0.05, 0.20 - 0.003 * diff)
+
     if diff <= tolerancia:
         # Dentro de la ventana óptima: bonus por ser más centrado
         return 1.0 - 0.15 * (diff / tolerancia)

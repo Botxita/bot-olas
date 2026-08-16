@@ -1,6 +1,14 @@
 # KNOWN_ISSUES.md — bot-olas
 
-Documento vivo de auditoría de fondo sobre `core/` (scoring, analysis, windows). Generado a partir de una revisión conjunta Claude Code + Codex (auditor independiente, ver `AGENTS.md`), enfocada específicamente en **errores de lógica silenciosos** (el código corre y no crashea, pero calcula algo incorrecto o inconsistente) y **edge cases no cubiertos por el test suite** (169 tests). No es un changelog — nada de lo listado acá está corregido todavía. Se corrige después de revisar la lista completa con Ivan.
+Documento vivo de auditoría de fondo sobre `core/` (scoring, analysis, windows). Generado a partir de una revisión conjunta Claude Code + Codex (auditor independiente, ver `AGENTS.md`), enfocada específicamente en **errores de lógica silenciosos** (el código corre y no crashea, pero calcula algo incorrecto o inconsistente) y **edge cases no cubiertos por el test suite** (169 tests).
+
+**Estado (actualizado tras 3 rondas de fixes):** de los 31 hallazgos documentados, **13 fueron corregidos** en 3 grupos priorizados por Ivan — cada uno marcado `✅ RESUELTO` con su commit. Los **18 restantes siguen abiertos** (sin marcar), quedaron fuera del alcance de esta ronda; no asumir que están corregidos solo porque están en este archivo.
+
+- **Grupo 1** (`fix-grupo1-scoring-critico`): #5, #12, #22.
+- **Grupo 2** (`fix-grupo2-analisis-y-detector`): #1, #3, #4, #11, #23, #24.
+- **Grupo 3** (`fix-grupo3-riesgos-configuracion`): #9, #10, #13, #30.
+
+Cada fix pasó por revisión obligatoria de Codex antes de commitear (ver `AGENTS.md`) y sumó tests de regresión — el test suite completo sigue en 217 passed / 15 failed (los 15 son fixtures de fecha fija preexistentes, no relacionados a este documento).
 
 Formato por hallazgo: módulo, severidad, líneas, descripción, escenario concreto, por qué el test suite no lo agarra.
 
@@ -13,6 +21,8 @@ Severidad: **alta** = puede cambiar una recomendación real hoy con la config de
 Auditado completo (355 líneas) contra `models.py`, `config/scoring_weights.json` y los 59 `config/spots/*.json` reales, y contrastado contra `tests/test_scoring.py`.
 
 ### 1. `marea_tipo_efecto` no afecta el score numérico — **alta**
+
+**✅ RESUELTO** — commit `605a9e1` (`fix(#1): marea_tipo_efecto ahora afecta el score numérico de marea`).
 
 - Código: [`_score_marea()`, engine.py:180-207](core/scoring/engine.py#L180). El campo se lee únicamente para elegir texto de flag en [engine.py:271](core/scoring/engine.py#L271), nunca en el cálculo numérico.
 - Hay 13 spots reales `low_better` y 46 `mid_better` (ninguno `high_better` todavía).
@@ -30,17 +40,23 @@ Auditado completo (355 líneas) contra `models.py`, `config/scoring_weights.json
 
 ### 3. Límites de período y viento del `SpotConfig` cargados pero nunca usados — **alta**
 
+**✅ RESUELTO** — commit `d8638eb` (`fix(#3): usar periodo_min/viento_max del spot en vez de escalones globales`).
+
 - Campos: `swell_periodo_min`, `viento_max_offshore`, `viento_max_onshore` en [models.py:149-151](core/scoring/models.py#L149). El registry los carga desde JSON, pero `_score_periodo()` y `_score_viento()` en engine.py usan únicamente escalones globales hardcodeados, ignorando estos campos por completo.
 - Ejemplo real: un spot tolera onshore hasta 18 km/h según su config, otro (Necochea) tiene máximo onshore configurado en 10 km/h. Un onshore de 12 km/h recibe exactamente `0.30` en ambos — el límite específico del spot no cambia nada.
 - **Cobertura:** no cubierta. Los tests verifican la curva global de viento/período, nunca que cambiar estos campos en un `SpotConfig` altere el resultado.
 
 ### 4. Ola por encima del máximo configurado sigue subiendo el score — **alta**
 
+**✅ RESUELTO** — commit `ac80e91` (`fix(#4): ola por encima del máximo del spot ya no sigue subiendo el score`).
+
 - `swell_altura_max` solo dispara un flag negativo ("Ola grande para el spot") en [engine.py:251-260](core/scoring/engine.py#L251-260). El score de energía sigue creciendo monótonamente con `altura²` en `_energia_proxy`/`_score_energia` ([engine.py:47-56](core/scoring/engine.py#L47)), sin tope relacionado a `swell_altura_max`.
 - Ejemplo (spot con máximo 2 m, período 12s): altura 2m → energía 48, score energía ≈0.82. Altura 4m (el doble del máximo del spot) → energía 192, score energía ≈1.00. El motor agrega el flag de advertencia, pero numéricamente premia la condición que el spot marca como peligrosa/inadecuada.
 - **Cobertura:** parcialmente ejercitada pero no detectada — `test_score_rango` prueba alturas hasta 4m pero solo verifica que el total quede en `[0,100]`, no que superar el máximo penalice.
 
 ### 5. `direcciones_ideales` de los 59 spots no llegan al motor — **alta**
+
+**✅ RESUELTO** — commit `dbf52f5` (`fix(#5): usar direcciones_ideales del spot en el score de dirección swell`).
 
 - Todos los JSON de spot declaran `direcciones_ideales` (lista), pero `SpotConfig` no tiene ese campo, el registry no lo carga, y el engine solo usa `orientacion_costa_deg ± tolerancia_swell_deg`.
 - Ejemplo real: un spot declara `direcciones_ideales = [90, 135, 180]` pero tiene `orientacion_costa_deg=95` y `tolerancia=45`. Para swell de 180° (una de sus direcciones marcadas como ideales): diff=85°, score dirección ≈0.465 — el flag lo clasifica apenas como "aceptable", no como ideal.
@@ -68,12 +84,16 @@ Auditado completo (355 líneas) contra `models.py`, `config/scoring_weights.json
 
 ### 9. Altura ajustada negativa se vuelve energía positiva silenciosamente — **baja (riesgo de configuración futura)**
 
+**✅ RESUELTO** — commit `b478ff9` (`fix(#9): clampear altura ajustada a piso 0.0 (delta_altura negativo)`).
+
 - `swell_ajustado.altura_m = hour.swell.altura_m + spot.delta_altura` ([engine.py:310-316](core/scoring/engine.py#L310)). Si `delta_altura` es negativo y de magnitud mayor a la altura real, la altura ajustada queda negativa; `_energia_proxy` eleva al cuadrado y el signo se pierde.
 - Ejemplo: altura real 0.2m, `delta_altura=-1.0` → altura ajustada -0.8m, energía con T=10 → `(-0.8)²×10=6.4`, igual a una ola real de +0.8m.
 - Los 59 JSON actuales tienen todos `delta_altura=0` (no se dispara hoy), pero `delta_altura` es ajustable en runtime vía `spot_adjustments` de SQLite (calibración empírica por usuario/admin, ver CLAUDE.md/AGENTS.md) — no hay validación de piso.
 - **Cobertura:** no cubierta. No hay tests de `delta_altura` ni de altura ajustada negativa.
 
 ### 10. Tolerancia de swell = 0 produce `ZeroDivisionError` — **baja (riesgo de configuración futura)**
+
+**✅ RESUELTO** — commit `26feb0b` (`fix(#10): tolerancia de swell <=0 ya no crashea ni contradice el flag`).
 
 - Código: [engine.py:107-115](core/scoring/engine.py#L107). Con `tolerancia=0` y `diff=0`: `diff/tolerancia` = `0/0` → excepción no capturada (esto sí sería un crash, no un error silencioso, pero queda documentado junto a los demás hallazgos de esta zona del código).
 - Ninguno de los 59 JSON actuales usa tolerancia 0 (rango real: 30°-60°), y el registry no valida que el valor sea positivo.
@@ -87,6 +107,8 @@ Auditado contra `tests/test_tides.py`, `tests/test_daylight.py`, `tests/test_bes
 
 ### 11. `analizar_semana()` incluye horas ya pasadas del día de hoy — **alta**
 
+**✅ RESUELTO** — commit `f663e8b` (`fix(#11): no recomendar ni promediar horas ya pasadas del día de hoy`).
+
 - Código: filtro de fechas [weekly.py:94-100](core/analysis/weekly.py#L94), análisis diario [weekly.py:133-173](core/analysis/weekly.py#L133). `calcular_mejor_hora()` tampoco filtra contra "ahora" ([best_hour.py:75-83](core/analysis/best_hour.py#L75)).
 - Solo se excluyen fechas anteriores a hoy; para el día de hoy se conservan **todas** las horas diurnas, incluidas las que ya pasaron.
 - Ejemplo a las 17:00: hora 09:00 (ya pasada) con score 0.90, hora 18:00 (futura) con score 0.60. El análisis semanal marca las 09:00 como "mejor hora de hoy" y la incluye en el promedio del día — una recomendación que ya no se puede usar, y que además sobrevalora el día de hoy frente a mañana en la comparación semanal.
@@ -94,12 +116,16 @@ Auditado contra `tests/test_tides.py`, `tests/test_daylight.py`, `tests/test_bes
 
 ### 12. Ranking con solo horas nocturnas lanza `ValueError` no capturado — **alta**
 
+**✅ RESUELTO** — commit `ddc69e6` (`fix(#12): calcular_ranking_dia() no debe crashear sin horas diurnas`).
+
 - Código: [best_hour.py:166-177](core/analysis/best_hour.py#L166) (`calcular_ranking_dia`), impacta también a [hourly_view.py:63-68](core/analysis/hourly_view.py#L63) (`generar_vista_horaria`, que llama con `incluir_noche=True` por default).
 - Con `incluir_noche=True`, si hay horas para la fecha pero **ninguna** tiene `es_dia=True`, `max(x[1].score_total for x in scored_con_flag if x[2])` opera sobre un generador vacío y crashea.
 - Ejemplo: forecast corto que solo cubre 22:00, 23:00 y 00:00 locales para la fecha pedida — la vista horaria debería degradarse mostrando filas nocturnas (para eso existe `incluir_noche`), pero en cambio revienta.
 - **Cobertura:** no cubierta. Los tests con `incluir_noche=True` siempre construyen las 24 horas del día, garantizando que existan horas diurnas.
 
 ### 13. `delta_altura` del spot ajusta tanto el swell como la marea con el mismo valor — **alta**
+
+**✅ RESUELTO** — commit `dd3ea29` (`fix(#13): separar delta_marea de delta_altura, aplicar en scoring completo`). Decisión de producto (separar en dos campos) tomada por Ivan explícitamente, no fue una decisión unilateral de implementación.
 
 - Aplicación en marea: [tides.py:98-104](core/analysis/tides.py#L98). Aplicación en swell: [engine.py:310-313](core/scoring/engine.py#L310-313). `SpotConfig` solo tiene un campo `delta_altura` ([models.py:152](core/scoring/models.py#L152)) para ambos usos.
 - Ejemplo: calibrar un spot con `delta_altura=+0.3` porque Open-Meteo subestima la altura de ola desplaza **también** todos los niveles de marea +0.3m — sin evidencia de que ambas correcciones físicas deban coincidir. Puede mover artificialmente eventos de marea dentro o fuera del rango óptimo del spot.
@@ -162,6 +188,8 @@ Auditado en dos pasadas contra `tests/test_scoring.py` (los 4 tests que ejercita
 
 ### 22. No aplica el límite de 48 horas que promete su propio contrato — **alta**
 
+**✅ RESUELTO** — commit `d283660` (`fix(#22): detector respeta el horizonte de 48h declarado`).
+
 - El docstring y la feature ("Próximas olas 48h") prometen una ventana de 48h ([detector.py:35-53](core/windows/detector.py#L35)), pero no hay ningún filtro `now + 48h` en el código.
 - `core/forecast/open_meteo.py` devuelve hasta 168 horas (7 días) ([open_meteo.py:79-84](core/forecast/open_meteo.py#L79), [open_meteo.py:148-152](core/forecast/open_meteo.py#L148)), y los handlers le pasan esa lista completa al detector sin recortar.
 - Ejemplo: si mañana hay una ventana con score promedio 0.70 y dentro de 6 días hay una con 0.90, con `top_n=3` la ventana de dentro de 6 días puede aparecer en la lista de "Próximas olas — 48h", contradiciendo el título de la sección.
@@ -169,12 +197,16 @@ Auditado en dos pasadas contra `tests/test_scoring.py` (los 4 tests que ejercita
 
 ### 23. Fallos de scoring se convierten silenciosamente en "no hay ventanas" — **alta si el fallo es sistemático, media si es puntual**
 
+**✅ RESUELTO** — commit `3ffa0c2` (`fix(#23): propagar error cuando el scoring falla para todas las horas`). Solo cubre el caso 100% de fallos, tal como se diseñó; un fallo parcial sigue descartándose en silencio a propósito.
+
 - Código: `except Exception as e: logger.warning(...); continue` en [detector.py:79-85](core/windows/detector.py#L79). La hora se descarta del pool, el error solo queda en logs, no se retorna ningún estado de error.
 - Si `calcular_score()` falla para todas las horas (ej. una config de spot rota — como la tolerancia=0 del hallazgo #10 de engine.py), el detector devuelve `[]`, exactamente lo mismo que devolvería un forecast válido sin buenas condiciones. El caller (bot/handlers) no tiene forma de distinguir "no hay olas" de "no se pudo calcular".
 - Si falla solo una hora intermedia, además puede disparar el hallazgo #24 (fusión de huecos), porque la hora fallida desaparece de la lista sin dejar rastro de que había un hueco temporal ahí.
 - **Cobertura:** no cubierta. Ningún test provoca una excepción dentro de `calcular_score()`.
 
 ### 24. Ventana parcialmente pasada conserva promedio y hora pico de horas ya pasadas — **media**
+
+**✅ RESUELTO** — commit `22470d4` (`fix(#24): ventana en curso recalcula stats solo con horas vigentes`).
 
 - Código: filtro final [detector.py:117-119](core/windows/detector.py#L117) solo elimina ventanas con `fin <= now`; una ventana en curso se conserva completa, sin recortar las horas que ya pasaron.
 - Ejemplo a las 12:30, ventana 10:00–14:00 con scores 10:00=0.95, 11:00=0.90, 12:00=0.70, 13:00=0.60: se muestra `score_promedio=0.7875`, `score_max=0.95`, `hora_pico=10:00` (ya pasada) y `horas_count=4`, aunque en la práctica solo queda la franja 13:00–14:00 por delante.
@@ -212,6 +244,8 @@ Auditado en dos pasadas contra `tests/test_scoring.py` (los 4 tests que ejercita
 
 ### 30. `umbral`/`top_n` sin validación de rango — **baja**
 
+**✅ RESUELTO** — commit `642677b` (`fix(#30): validar umbral/top_n en vez de dejar comportamientos silenciosos`). Resuelto con validación que lanza `ValueError`, no con clamp — ver discusión con Codex en el historial de la sesión.
+
 - Lectura: [detector.py:55-57](core/windows/detector.py#L55). Uso: [detector.py:93-94](core/windows/detector.py#L93) y [detector.py:121-123](core/windows/detector.py#L121).
 - `umbral` negativo → casi todo califica igual. `umbral > 1.0` → nada califica nunca. `top_n=0` → `[]`. `top_n=-1` → slicing `ventanas[:-1]` devuelve todas menos la última (comportamiento no intuitivo si se pasara por error). `top_n` no entero → `TypeError` en el slicing.
 - Los valores versionados actuales (`0.60`, `3`) son válidos — el riesgo es de configuración o de llamada incorrecta, no disparable hoy.
@@ -232,21 +266,28 @@ Encontrado por Codex durante la revisión del fix #13 (Grupo 3), no parte de la 
 
 ---
 
-## Priorización sugerida (según Codex, a confirmar en la revisión conjunta)
+## Priorización original (según Codex, histórica — ver estado real arriba en cada hallazgo)
 
-**Pueden estar alterando recomendaciones reales hoy**, con la config de 59 spots ya en producción:
+Esta lista refleja la priorización sugerida en la auditoría original, antes de los 3 grupos de fixes. Se conserva como registro histórico; el estado vigente de cada ítem está marcado en su sección correspondiente más arriba, no acá.
 
-1. Detector no respeta el horizonte de 48h — puede mostrar ventanas de hasta 7 días en una sección titulada "48h" (#22).
-2. Salto inverso en los límites de marea del engine — un cambio de milésimas de metro puede cruzar el umbral de ventana óptima (#2).
-3. `marea_tipo_efecto` ignorado en 13 spots reales `low_better` (#1).
-4. `analizar_semana()` mezcla horas ya pasadas de hoy en el promedio y la "mejor hora" del día (#11).
-5. Límites específicos de período/viento del spot ignorados por el engine (#3).
-6. Altura máxima configurada que no penaliza — el score sigue subiendo con olas más grandes que el máximo del spot (#4).
-7. `direcciones_ideales` de los 59 spots descartadas por el motor de scoring (#5).
-8. Fallos de scoring sistemáticos se ven idénticos a "no hay buenas condiciones" — sin señal de error (#23).
-9. Ventana parcialmente pasada conserva score/hora pico de horas que ya no sirven (#24).
-10. `delta_altura` acopla la calibración de swell y de marea con el mismo valor (#13).
+**Podían estar alterando recomendaciones reales en ese momento**, con la config de 59 spots en producción:
 
-**Riesgos de configuración futura**, no disparables con los datos/config versionados actuales: tolerancia swell = 0 (#10), altura ajustada negativa (#9), `umbral`/`top_n` fuera de rango (#30).
+1. ✅ Detector no respeta el horizonte de 48h (#22) — resuelto, `d283660`.
+2. 🔲 Salto inverso en los límites de marea del engine — un cambio de milésimas de metro puede cruzar el umbral de ventana óptima (#2) — **sigue abierto**.
+3. ✅ `marea_tipo_efecto` ignorado en 13 spots reales `low_better` (#1) — resuelto, `605a9e1`.
+4. ✅ `analizar_semana()` mezcla horas ya pasadas de hoy (#11) — resuelto, `f663e8b`.
+5. ✅ Límites específicos de período/viento del spot ignorados (#3) — resuelto, `d8638eb`.
+6. ✅ Altura máxima configurada que no penaliza (#4) — resuelto, `ac80e91`.
+7. ✅ `direcciones_ideales` de los 59 spots descartadas por el motor (#5) — resuelto, `dbf52f5`.
+8. ✅ Fallos de scoring sistemáticos indistinguibles de "no hay buenas condiciones" (#23) — resuelto, `3ffa0c2`.
+9. ✅ Ventana parcialmente pasada conserva score/hora pico viejo (#24) — resuelto, `22470d4`.
+10. ✅ `delta_altura` acoplaba swell y marea (#13) — resuelto, `dd3ea29`.
 
-**Crash confirmado (no solo silencioso)**: ranking con solo horas nocturnas + `incluir_noche=True` (#12) — vale la pena tratarlo con prioridad alta en la corrección aunque no sea "silencioso" por definición, porque puede tirar abajo la vista hora a hora para el usuario.
+**Riesgos de configuración futura** (no disparables con los datos/config versionados en ese momento):
+- ✅ Tolerancia swell = 0 (#10) — resuelto, `26feb0b`.
+- ✅ Altura ajustada negativa (#9) — resuelto, `b478ff9`.
+- ✅ `umbral`/`top_n` fuera de rango (#30) — resuelto, `642677b`.
+
+**Crash confirmado (no solo silencioso)**: ranking con solo horas nocturnas + `incluir_noche=True` (#12) — ✅ resuelto, `ddc69e6`.
+
+**Sin priorizar en la ronda original, todavía abiertos**: #6, #7, #8, #14, #15, #16, #17, #18, #19, #20, #21, #25, #26, #27, #28, #29, y #31 (hallado después, durante la revisión del fix #13).

@@ -22,6 +22,7 @@ from core.scoring.engine import (
     _score_marea,
     calcular_score,
     _angulo_relativo,
+    _mejor_diff_direccion,
     _tipo_viento,
 )
 from core.scoring.models import (
@@ -32,6 +33,7 @@ from core.scoring.models import (
     WindData,
 )
 from core.windows.detector import detectar_ventanas, calcular_score_actual
+from core.spots.registry import get_spot
 
 
 # ------------------------------------------------------------------
@@ -44,6 +46,7 @@ def make_spot(
     tolerancia=45,
     marea_min=0.4,
     marea_max=1.6,
+    direcciones_ideales=None,
 ) -> SpotConfig:
     return SpotConfig(
         key="test_varese",
@@ -65,6 +68,7 @@ def make_spot(
         swell_periodo_min=7.0,
         viento_max_offshore=35.0,
         viento_max_onshore=15.0,
+        direcciones_ideales=direcciones_ideales or [],
     )
 
 
@@ -139,18 +143,60 @@ class TestPeriodo(unittest.TestCase):
 class TestDireccionSwell(unittest.TestCase):
     def test_perfecto_central(self):
         """Swell que viene exactamente de frente → score máximo."""
-        s = _score_dir_swell(dir_swell=95, orientacion_costa=95, tolerancia=45)
+        diff = _angulo_relativo(95, 95)
+        s = _score_dir_swell(diff=diff, tolerancia=45)
         self.assertGreater(s, 0.9)
 
     def test_oblicuo(self):
         """Swell muy oblicuo a la costa → score bajo."""
-        s = _score_dir_swell(dir_swell=5, orientacion_costa=95, tolerancia=45)
+        diff = _angulo_relativo(5, 95)
+        s = _score_dir_swell(diff=diff, tolerancia=45)
         self.assertLess(s, 0.50)  # Al menos peor que las condiciones aceptables
 
     def test_angulo_relativo_180(self):
         """Swell de espaldas → diferencia = 180."""
         diff = _angulo_relativo(275, 95)
         self.assertAlmostEqual(diff, 180.0, delta=1.0)
+
+    def test_direccion_ideal_de_la_lista_distinta_de_orientacion(self):
+        """Con direcciones_ideales configuradas, un swell que coincide con
+        una de ellas (no con orientacion_costa_deg) debe dar diff=0."""
+        spot = make_spot(orientacion=95, direcciones_ideales=[90, 135, 180])
+        diff = _mejor_diff_direccion(180, spot)
+        self.assertEqual(diff, 0.0)
+
+    def test_selecciona_la_menor_diferencia_entre_varios_ideales(self):
+        """Debe usar el ideal más cercano, no el primero ni el promedio."""
+        spot = make_spot(orientacion=95, direcciones_ideales=[0, 180])
+        # 170 está a 10° de 180 y a 170° de 0 → debe ganar el de 180
+        diff = _mejor_diff_direccion(170, spot)
+        self.assertAlmostEqual(diff, 10.0, delta=0.01)
+
+    def test_lista_vacia_cae_a_orientacion_costa(self):
+        """Sin direcciones_ideales configuradas, el fallback es
+        orientacion_costa_deg — mismo resultado que el comportamiento previo."""
+        spot = make_spot(orientacion=95, direcciones_ideales=[])
+        diff_fallback = _mejor_diff_direccion(20, spot)
+        diff_manual = _angulo_relativo(20, 95)
+        self.assertAlmostEqual(diff_fallback, diff_manual, delta=0.01)
+
+    def test_ideal_unico_igual_a_orientacion_preserva_comportamiento_viejo(self):
+        """Una lista de un solo elemento igual a orientacion_costa_deg
+        debe comportarse exactamente igual que el fallback."""
+        spot_con_lista = make_spot(orientacion=95, direcciones_ideales=[95])
+        spot_sin_lista = make_spot(orientacion=95, direcciones_ideales=[])
+        for swell_dir in (30, 95, 200, 350):
+            self.assertAlmostEqual(
+                _mejor_diff_direccion(swell_dir, spot_con_lista),
+                _mejor_diff_direccion(swell_dir, spot_sin_lista),
+                delta=0.01,
+            )
+
+    def test_registry_carga_direcciones_ideales_reales(self):
+        """Confirma que el fix realmente conecta con la config real de
+        producción, no solo con spots de test armados a mano."""
+        spot = get_spot("mdq_playa_grande")
+        self.assertEqual(spot.direcciones_ideales, [90, 120, 150])
 
 
 class TestViento(unittest.TestCase):

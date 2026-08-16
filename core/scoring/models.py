@@ -6,7 +6,7 @@ testing sin Telegram, y uso futuro como API REST.
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 
 @dataclass
@@ -149,6 +149,9 @@ class SpotConfig:
     swell_periodo_min: float
     viento_max_offshore: float
     viento_max_onshore: float
+    # Direcciones de swell empíricamente ideales para el spot (grados, 0=N).
+    # Si está vacía, el engine usa orientacion_costa_deg como único ideal (fallback).
+    direcciones_ideales: List[float] = field(default_factory=list)
     delta_altura: float = 0.0
     factor_periodo: float = 1.0
     fuente_datos: str = "open-meteo"

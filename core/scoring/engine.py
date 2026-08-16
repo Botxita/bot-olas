@@ -97,13 +97,28 @@ def _angulo_relativo(dir_swell: float, orientacion_costa: float) -> float:
     return diff  # 0 = perfecto, 90 = paralelo, 180 = de espaldas
 
 
-def _score_dir_swell(dir_swell: float, orientacion_costa: float, tolerancia: float) -> float:
+def _mejor_diff_direccion(dir_swell: float, spot: SpotConfig) -> float:
+    """
+    Diferencia angular entre el swell y el ideal más cercano del spot.
+
+    Si el spot tiene `direcciones_ideales` configuradas (config/spots/*.json,
+    swell.direcciones_ideales), se usa la mínima diferencia contra cualquiera
+    de ellas — un point/reef break puede funcionar bien con más de un swell.
+    Si la lista está vacía, se usa orientacion_costa_deg como único ideal
+    (comportamiento previo, perpendicular a la costa).
+    """
+    ideales = spot.direcciones_ideales or [spot.orientacion_costa_deg]
+    return min(_angulo_relativo(dir_swell, ideal) for ideal in ideales)
+
+
+def _score_dir_swell(diff: float, tolerancia: float) -> float:
     """
     Score de dirección swell con tolerancia configurable por spot.
     Los beach breaks toleran más variación que los reef y point breaks.
-    """
-    diff = _angulo_relativo(dir_swell, orientacion_costa)
 
+    `diff` es la diferencia angular ya calculada contra el ideal más cercano
+    (ver `_mejor_diff_direccion`).
+    """
     if diff <= tolerancia:
         # Dentro de la ventana óptima: bonus por ser más centrado
         return 1.0 - 0.15 * (diff / tolerancia)
@@ -260,7 +275,7 @@ def _generar_flags(
             neutros.append(f"Tamaño manejable ({swell.altura_m:.1f}m)")
 
     # Dirección swell
-    diff = _angulo_relativo(swell.direccion_deg, spot.orientacion_costa_deg)
+    diff = _mejor_diff_direccion(swell.direccion_deg, spot)
     if diff <= spot.tolerancia_swell_deg:
         positivos.append("Dirección swell ideal")
     elif diff <= spot.tolerancia_swell_deg * 2:
@@ -319,11 +334,8 @@ def calcular_score(hour: ForecastHour, spot: SpotConfig) -> ScoreBreakdown:
     energia = _energia_proxy(swell_ajustado)
     s_energia = _score_energia(energia, escala_energia)
     s_periodo = _score_periodo(swell_ajustado.periodo_s)
-    s_dir = _score_dir_swell(
-        swell_ajustado.direccion_deg,
-        spot.orientacion_costa_deg,
-        spot.tolerancia_swell_deg,
-    )
+    diff_dir = _mejor_diff_direccion(swell_ajustado.direccion_deg, spot)
+    s_dir = _score_dir_swell(diff_dir, spot.tolerancia_swell_deg)
     s_viento = _score_viento(hour.wind, spot.orientacion_costa_deg)
     s_marea = _score_marea(hour.tide, spot)
 

@@ -131,6 +131,7 @@ def _build_spot_config(key: str, d: dict, pais: str, region: str) -> SpotConfig:
         swell_periodo_min=swell.get("periodo_min_s", 6.0),
         viento_max_offshore=viento.get("vel_max_offshore_kmh", 40.0),
         viento_max_onshore=viento.get("vel_max_onshore_kmh", 15.0),
+        direcciones_ideales=swell.get("direcciones_ideales", []),
         delta_altura=ajustes.get("delta_altura", 0.0),
         factor_periodo=ajustes.get("factor_periodo", 1.0),
         fuente_datos=d.get("fuente_datos", "open-meteo"),

@@ -378,6 +378,26 @@ def test_ranking_dia_vacio():
     assert result == []
 
 
+def test_ranking_dia_solo_horas_nocturnas_no_crashea():
+    """
+    Regresión #12: si incluir_noche=True y ninguna hora del día cae dentro
+    de la ventana de luz solar, calcular_ranking_dia() no debe crashear con
+    ValueError — debe degradar devolviendo las horas nocturnas con rank=999.
+    """
+    tz = ZoneInfo("America/Argentina/Buenos_Aires")
+    medianoche = datetime(FECHA_TEST.year, FECHA_TEST.month, FECHA_TEST.day, 0, 0, tzinfo=tz)
+    # En enero MDP el sunrise es ~05:30-06:00 local — 1h, 2h y 3h son de madrugada, antes del sunrise.
+    horas_madrugada = [medianoche + timedelta(hours=h) for h in (1, 2, 3)]
+    forecast = [make_hour(dt.astimezone(timezone.utc), score_override=0.9) for dt in horas_madrugada]
+    sf = mock_score_fn(scores_dict_from_forecast(forecast))
+
+    result = calcular_ranking_dia(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf, incluir_noche=True)
+
+    assert len(result) == 3
+    assert all(not rh.es_dia for rh in result), "Las 3 horas de madrugada deben quedar es_dia=False"
+    assert all(rh.rank == 999 for rh in result), "Sin horas diurnas, todas deben quedar con rank=999"
+
+
 def test_ranking_dia_fecha_sin_datos():
     """Fecha sin horas en el forecast retorna lista vacía."""
     forecast = make_forecast_dia(FECHA_TEST)
@@ -427,6 +447,7 @@ if __name__ == "__main__":
         test_ranking_dia_ranks_unicos,
         test_ranking_dia_vacio,
         test_ranking_dia_fecha_sin_datos,
+        test_ranking_dia_solo_horas_nocturnas_no_crashea,
         test_ranked_hour_es_dataclass,
     ]
 

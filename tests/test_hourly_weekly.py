@@ -207,6 +207,35 @@ def test_hourly_view_spot_y_fecha_en_resultado():
     assert result.spot.key == SPOT.key
 
 
+def test_hourly_view_solo_horas_nocturnas_no_crashea():
+    """
+    Regresión #12: generar_vista_horaria() usa incluir_noche=True por default,
+    justo el caso que crasheaba en calcular_ranking_dia() cuando el día no
+    tiene ninguna hora diurna. No debe crashear, y no debe haber mejor_hora.
+    """
+    tz = ZoneInfo("America/Argentina/Buenos_Aires")
+    medianoche = datetime(FECHA.year, FECHA.month, FECHA.day, 0, 0, tzinfo=tz)
+    horas_madrugada = [medianoche + timedelta(hours=h) for h in (1, 2, 3)]
+    forecast = []
+    for dt in horas_madrugada:
+        h = ForecastHour(
+            timestamp=dt.astimezone(timezone.utc),
+            swell=SwellData(altura_m=1.5, periodo_s=12.0, direccion_deg=95.0),
+            wind=WindData(velocidad_kmh=15.0, rafaga_kmh=20.0, direccion_deg=180.0),
+            tide=TideData(nivel_m=0.8, fuente="proxy_msl"),
+        )
+        h._test_score = 0.9
+        forecast.append(h)
+    sf = mock_score_fn(scores_dict(forecast))
+
+    result = generar_vista_horaria(forecast, SPOT, FECHA, score_fn=sf)
+
+    assert result is not None
+    assert len(result.filas) == 3
+    assert all(not f.es_dia for f in result.filas)
+    assert result.mejor_hora is None, "Sin horas diurnas no debería haber mejor_hora"
+
+
 # ===========================================================================
 # TESTS: weekly
 # ===========================================================================
@@ -382,6 +411,7 @@ if __name__ == "__main__":
         test_hourly_view_vacio,
         test_hourly_view_fecha_sin_datos,
         test_hourly_view_spot_y_fecha_en_resultado,
+        test_hourly_view_solo_horas_nocturnas_no_crashea,
     ]
 
     tests_weekly = [

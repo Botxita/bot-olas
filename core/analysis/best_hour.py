@@ -169,14 +169,10 @@ def calcular_ranking_dia(
     # Ordenar cronológicamente para vista hora a hora
     scored_con_flag.sort(key=lambda x: x[0].timestamp)
 
-    # Determinar cuál es la mejor hora del día (para marcar is_best)
-    mejor_score = max(x[1].score_total for x in scored_con_flag if x[2])  # solo entre horas con luz
-    mejor_ts = next(
-        x[0].timestamp for x in scored_con_flag
-        if x[2] and x[1].score_total == mejor_score
-    )
-
-    # Asignar ranks solo entre horas con luz (orden cronológico preservado)
+    # Asignar ranks solo entre horas con luz (orden cronológico preservado).
+    # Si no hay ninguna hora diurna (ej. forecast corto que cae todo de noche),
+    # rank_map queda vacío y todas las horas reciben rank=999 vía rank_map.get()
+    # más abajo — degrada con gracia en vez de romper.
     horas_dia_sorted_score = sorted(
         [(i, x) for i, x in enumerate(scored_con_flag) if x[2]],
         key=lambda ix: ix[1][1].score_total,

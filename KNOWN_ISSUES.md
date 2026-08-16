@@ -2,7 +2,7 @@
 
 Documento vivo de auditoría de fondo sobre `core/` (scoring, analysis, windows) y, desde el hallazgo #32, sobre **calidad de datos geográficos** de `config/spots/*.json`. Generado a partir de una revisión conjunta Claude Code + Codex (auditor independiente, ver `AGENTS.md`).
 
-**Estado (actualizado tras 3 rondas de fixes de código + 1 ronda de auditoría de datos + primera tanda de fixes de datos verificados):** de los **55 hallazgos documentados** (31 de código + 24 de datos geográficos), **18 fueron corregidos** — 13 de código en 3 grupos priorizados por Ivan, más 5 de datos geográficos (#33, #34, #41, #44, #47) que Ivan verificó personalmente contra Google Maps antes de aplicar. #45 fue verificado y confirmado que **no** necesita corrección. El resto de #32-#55 (18 hallazgos: #32, #35-40, #42-43, #46, #48-55) sigue como auditoría sin aplicar — ver advertencia de confiabilidad en esa sección antes de actuar, la mayoría son estimaciones de Codex sin verificación cartográfica. Los demás hallazgos de código sin marcar (#2, #6-#8, #14-#21, #25-#29, #31) también siguen abiertos.
+**Estado (actualizado tras 3 rondas de fixes de código + 1 ronda de auditoría de datos + fixes de datos verificados por Ivan en Google Maps):** de los **55 hallazgos documentados** (31 de código + 24 de datos geográficos), **19 fueron corregidos** — 13 de código en 3 grupos priorizados por Ivan, más 6 de datos geográficos (#33, #34, #41, #43, #44, #47) que Ivan verificó personalmente contra Google Maps antes de aplicar. #45 fue verificado y confirmado que **no** necesita corrección. Un "grupo confiable" adicional (#32, #37-40, #50, #51 — orientaciones y coordenadas estimadas por Codex, sin verificación cartográfica) está aplicado en el working tree pero **todavía sin commitear**, esperando OK final. El resto (#35, #36, #42, #46, #48, #49, #52-55) sigue como auditoría sin aplicar — ver advertencia de confiabilidad en esa sección antes de actuar. Los demás hallazgos de código sin marcar (#2, #6-#8, #14-#21, #25-#29, #31) también siguen abiertos.
 
 - **Grupo 1** (`fix-grupo1-scoring-critico`): #5, #12, #22.
 - **Grupo 2** (`fix-grupo2-analisis-y-detector`): #1, #3, #4, #11, #23, #24.
@@ -344,7 +344,7 @@ Severidad (distinta a la de `core/`, adaptada a datos geográficos):
 
 ### 43. `punta_de_lobos` — longitud parece mar adentro — **media**
 
-**🔲 SIGUE PENDIENTE** — Ivan no lo verificó todavía (a diferencia de los demás de este archivo). No tocar sin confirmación directa en Maps.
+**✅ RESUELTO** — aplicado junto con esta misma actualización de KNOWN_ISSUES.md (un solo commit, ver `git log -- config/spots/chile.json`). Ivan verificó contra Google Maps: `lat -34.425496, lon -72.042924`.
 
 - `lon=-72.0833` ubicaría el punto varios km mar adentro; Codex estima la rompiente/promontorio real en `~-34.43, -72.04/-72.05`.
 - Latitud, región y ciudad correctas — Codex no marca `orientacion_costa_deg=260` como sospechoso acá.

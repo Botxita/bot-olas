@@ -74,7 +74,7 @@
         "punta_de_lobos": {
           "nombre": "Punta de Lobos",
           "ciudad": "Pichilemu",
-          "lat": -34.4333, "lon": -72.0833,
+          "lat": -34.425496, "lon": -72.042924,
           "orientacion_costa_deg": 260, "tolerancia_swell_deg": 30,
           "tipo_break": "point", "fondo": "roca",
           "marea": {"rango_optimo_min_m": 0.5, "rango_optimo_max_m": 1.8, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico. Marea baja expone roca."},

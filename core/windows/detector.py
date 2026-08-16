@@ -12,6 +12,7 @@ Algoritmo:
 
 import json
 import logging
+import math
 import os
 from datetime import datetime, timezone, timedelta
 from typing import List
@@ -60,6 +61,21 @@ def detectar_ventanas(
     config = _get_config()
     umbral = umbral if umbral is not None else config.get("umbral_ventana_optima", 0.60)
     top_n = top_n if top_n is not None else config.get("top_ventanas", 3)
+
+    # Validar rangos. umbral/top_n vienen de scoring_weights.json o de un
+    # caller — un valor fuera de rango no es un error de datos del
+    # forecast, es config imposible de interpretar de forma útil. Igual
+    # que el fix #23: fallar temprano y visible en vez de degradar en
+    # silencio (clampear "arreglaría" el síntoma pero produciría otro
+    # comportamiento silencioso — ej. top_n=0.9 truncado a 0 se vería
+    # idéntico a "no hay ventanas buenas"). Los handlers de
+    # bot/handlers/main.py ya envuelven detectar_ventanas() en un
+    # try/except genérico que muestra un mensaje de error legible.
+    if isinstance(umbral, bool) or not isinstance(umbral, (int, float)) \
+            or not math.isfinite(umbral) or not (0.0 <= umbral <= 1.0):
+        raise ValueError(f"umbral debe ser un número finito entre 0 y 1, recibido: {umbral!r}")
+    if isinstance(top_n, bool) or not isinstance(top_n, int) or top_n < 0:
+        raise ValueError(f"top_n debe ser un entero >= 0, recibido: {top_n!r}")
 
     if not forecast:
         return []

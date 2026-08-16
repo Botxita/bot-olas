@@ -727,6 +727,95 @@ class TestDetectorVentanas(unittest.TestCase):
         ventanas = detectar_ventanas([], spot)
         self.assertEqual(ventanas, [])
 
+    def test_umbral_negativo_lanza_error(self):
+        """
+        Regresión #30: umbral fuera de [0,1] es config imposible de
+        interpretar, no un caso silencioso a normalizar — mismo criterio
+        que el fix #23 (fallar visible, no degradar en silencio).
+        """
+        spot = make_spot()
+        forecast = [make_hour()]
+        with self.assertRaises(ValueError):
+            detectar_ventanas(forecast, spot, umbral=-5.0)
+
+    def test_umbral_mayor_a_uno_lanza_error(self):
+        spot = make_spot()
+        forecast = [make_hour()]
+        with self.assertRaises(ValueError):
+            detectar_ventanas(forecast, spot, umbral=5.0)
+
+    def test_umbral_nan_lanza_error(self):
+        spot = make_spot()
+        forecast = [make_hour()]
+        with self.assertRaises(ValueError):
+            detectar_ventanas(forecast, spot, umbral=float("nan"))
+
+    def test_umbral_infinito_lanza_error(self):
+        spot = make_spot()
+        forecast = [make_hour()]
+        with self.assertRaises(ValueError):
+            detectar_ventanas(forecast, spot, umbral=float("inf"))
+
+    def test_umbral_en_los_bordes_no_lanza_error(self):
+        """0.0 y 1.0 son válidos (bordes inclusive del rango)."""
+        spot = make_spot()
+        forecast = [make_hour()]
+        detectar_ventanas(forecast, spot, umbral=0.0)  # no debe lanzar
+        detectar_ventanas(forecast, spot, umbral=1.0)  # no debe lanzar
+
+    def test_umbral_bool_lanza_error(self):
+        """bool es subclase de int en Python — debe rechazarse explícitamente
+        (mismo motivo que test_top_n_bool_lanza_error)."""
+        spot = make_spot()
+        forecast = [make_hour()]
+        with self.assertRaises(ValueError):
+            detectar_ventanas(forecast, spot, umbral=True)
+
+    def test_umbral_string_lanza_error(self):
+        spot = make_spot()
+        forecast = [make_hour()]
+        with self.assertRaises(ValueError):
+            detectar_ventanas(forecast, spot, umbral="0.6")
+
+    def test_top_n_negativo_lanza_error(self):
+        """
+        Regresión #30: top_n=-1 hacía slicing `ventanas[:-1]` ("todas
+        menos la última") en vez de fallar visiblemente por config inválida.
+        """
+        spot = make_spot()
+        forecast = [make_hour()]
+        with self.assertRaises(ValueError):
+            detectar_ventanas(forecast, spot, umbral=0.5, top_n=-1)
+
+    def test_top_n_float_lanza_error(self):
+        """top_n no entero (ej. 3.7) debe fallar explícitamente, no
+        truncarse en silencio a un valor distinto del pedido."""
+        spot = make_spot()
+        forecast = [make_hour()]
+        with self.assertRaises(ValueError):
+            detectar_ventanas(forecast, spot, umbral=0.5, top_n=3.7)
+
+    def test_top_n_bool_lanza_error(self):
+        """bool es subclase de int en Python (isinstance(True, int) es
+        True) — debe rechazarse explícitamente, no colarse como top_n=1/0."""
+        spot = make_spot()
+        forecast = [make_hour()]
+        with self.assertRaises(ValueError):
+            detectar_ventanas(forecast, spot, umbral=0.5, top_n=True)
+
+    def test_top_n_string_lanza_error(self):
+        spot = make_spot()
+        forecast = [make_hour()]
+        with self.assertRaises(ValueError):
+            detectar_ventanas(forecast, spot, umbral=0.5, top_n="3")
+
+    def test_top_n_cero_no_lanza_error(self):
+        """top_n=0 es válido (0 es un entero >= 0 legítimo) — retorna []."""
+        spot = make_spot()
+        forecast = [make_hour()]
+        ventanas = detectar_ventanas(forecast, spot, umbral=0.5, top_n=0)
+        self.assertEqual(ventanas, [])
+
     def test_horizonte_48h_excluye_ventanas_lejanas(self):
         """
         Regresión #22: aunque el forecast recibido tenga más de 48h de datos

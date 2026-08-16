@@ -373,6 +373,49 @@ def test_serie_senoidal_tiene_extremos_claros():
 # Tests de filtrado por timestamp (parámetro 'desde')
 # ---------------------------------------------------------------------------
 
+def test_desde_tiene_extremos_claros_usa_amplitud_filtrada():
+    """
+    Regresión #18: tiene_extremos_claros mezclaba eventos filtrados por
+    'desde' con la amplitud de TODA la serie sin filtrar. Un pasado muy
+    volátil (amplitud 0.5, sobre el umbral 0.05) seguido de un futuro casi
+    plano (amplitud real ~0.003, un micro-extremo del ruido del proxy) daba
+    tiene_extremos_claros=True aunque el único extremo disponible dentro de
+    la ventana filtrada no fuera claro en absoluto.
+
+    'desde' arranca INMEDIATAMENTE después del tramo volátil (sin buffer):
+    el suavizado por ventana=3 es centrado, así que niveles_suavizados[idx]
+    justo en 'desde' todavía incorpora el último valor volátil anterior —
+    un simple slice de la serie ya suavizada (`niveles_suavizados[idx:]`)
+    seguiría contaminado ahí y daría el mismo bug con otra cara. Hace falta
+    re-suavizar la sub-serie ya recortada para que quede realmente limpia.
+    El micro-bump que sobrevive al filtro como evento está unas horas más
+    adelante (índice 7), lejos del borde contaminado, para que su detección
+    (sobre la serie completa, sin recortar) no dependa de este fix.
+    """
+    inicio = datetime(2025, 1, 15, 0, 0, tzinfo=timezone.utc)
+    niveles = [0.2, 1.4, 0.2, 1.4, 0.50, 0.50, 0.50, 0.51, 0.50, 0.50]
+    forecast = []
+    for i, nivel in enumerate(niveles):
+        ts = inicio + timedelta(hours=i)
+        tide = TideData(nivel_m=nivel, fuente="proxy_msl", es_exacto=False)
+        swell = SwellData(altura_m=1.0, periodo_s=10.0, direccion_deg=180.0)
+        wind = WindData(velocidad_kmh=10.0, rafaga_kmh=15.0, direccion_deg=180.0)
+        forecast.append(ForecastHour(timestamp=ts, swell=swell, wind=wind, tide=tide))
+
+    desde = inicio + timedelta(hours=4)  # justo después del último valor volátil (índice 3 = 1.4)
+
+    result_sin_filtro = detectar_mareas(forecast)
+    assert result_sin_filtro.tiene_extremos_claros is True, \
+        "sanity check: la serie completa (con el pasado volátil) sí tiene amplitud clara"
+
+    result_filtrado = detectar_mareas(forecast, desde=desde)
+    assert len(result_filtrado.eventos) >= 1, \
+        "sanity check: el micro-extremo futuro debe sobrevivir al filtro 'desde'"
+    assert result_filtrado.tiene_extremos_claros is False, \
+        "la amplitud usada debe ser la de la ventana filtrada re-suavizada (~0.003), " \
+        "no la contaminada por el último valor volátil justo antes de 'desde' (0.8)"
+
+
 def test_desde_filtra_eventos_pasados():
     """El parámetro 'desde' debe excluir eventos anteriores."""
     forecast = make_forecast_senoidal(n_horas=48)

@@ -116,21 +116,32 @@ def detectar_mareas(
     # Calcular tendencia actual (últimas 3 horas disponibles)
     tendencia, proximo_cambio = _calcular_tendencia(timestamps, niveles_suavizados)
 
-    # nivel_actual debe reflejar el primer punto relevante para el caller
-    # (>= 'desde'), no el primer elemento de TODO el forecast — antes,
-    # con 'desde' filtrando el pasado, nivel_actual seguía mostrando un
-    # nivel ya pasado en vez del que corresponde a la ventana pedida (#17).
-    # Si ningún timestamp cae en o después de 'desde', no hay nivel
-    # relevante que reportar.
-    if desde is not None:
-        idx_desde = next((i for i, ts in enumerate(timestamps) if ts >= desde), None)
-        nivel_actual = niveles[idx_desde] if idx_desde is not None else None
-    else:
-        nivel_actual = niveles[0] if niveles else None
+    # Índice del primer punto relevante para el caller (>= 'desde'), o 0 si
+    # no se filtra. Se reutiliza tanto para nivel_actual (#17) como para la
+    # amplitud usada en tiene_extremos_claros (#18) — antes, esa amplitud
+    # se calculaba sobre TODA la serie sin filtrar, así que un pasado muy
+    # variable podía dar tiene_extremos_claros=True aunque el único extremo
+    # dentro de la ventana filtrada por 'desde' fuera un micro-extremo del
+    # ruido del proxy, sin sentido real.
+    idx_desde = next((i for i, ts in enumerate(timestamps) if ts >= desde), None) if desde is not None else 0
 
+    # nivel_actual debe reflejar el primer punto relevante para el caller,
+    # no el primer elemento de TODO el forecast — antes, con 'desde'
+    # filtrando el pasado, nivel_actual seguía mostrando un nivel ya
+    # pasado en vez del que corresponde a la ventana pedida (#17). Si
+    # ningún timestamp cae en o después de 'desde', no hay nivel relevante
+    # que reportar.
+    nivel_actual = niveles[idx_desde] if idx_desde is not None else None
+
+    # Re-suavizado sobre la sub-serie ya recortada, no un slice de
+    # niveles_suavizados — la media móvil es CENTRADA, así que
+    # niveles_suavizados[idx_desde] todavía incorpora niveles[idx_desde-1]
+    # (anterior a 'desde'); un último nivel histórico extremo podía seguir
+    # inflando la amplitud filtrada incluso cortando la lista ya suavizada.
+    niveles_relevantes = _suavizar(niveles[idx_desde:], ventana=3) if idx_desde is not None else []
     tiene_claros = (
         len(eventos) >= 1
-        and _amplitud_serie(niveles_suavizados) >= _AMPLITUD_MINIMA_M
+        and _amplitud_serie(niveles_relevantes) >= _AMPLITUD_MINIMA_M
     )
 
     return TideAnalysis(

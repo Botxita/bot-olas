@@ -8,7 +8,7 @@ Depende de: core.scoring (modelos + motor), core.analysis.daylight.
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 
 from core.scoring.models import ForecastHour, ScoreBreakdown, SpotConfig
@@ -41,6 +41,7 @@ def calcular_mejor_hora(
     spot: SpotConfig,
     fecha: date,
     score_fn=None,
+    ahora: Optional[datetime] = None,
 ) -> Optional[BestHourResult]:
     """
     Encuentra la mejor hora del día 'fecha' para surfear en el spot.
@@ -48,6 +49,10 @@ def calcular_mejor_hora(
     Filtra:
       - Solo horas que correspondan a 'fecha' en la tz del spot.
       - Solo horas dentro del período de luz solar.
+      - Solo horas cuyo bloque horario todavía no terminó — evita
+        recomendar como "mejor hora" una franja ya pasada cuando 'fecha'
+        es hoy, y evita que horas pasadas de hoy se cuelen en el promedio
+        diario que usa analizar_semana() para comparar días entre sí.
 
     Args:
         forecast: Lista completa de ForecastHour (UTC-aware).
@@ -55,6 +60,9 @@ def calcular_mejor_hora(
         fecha: Fecha local del spot (date).
         score_fn: Función de scoring. Si es None, usa el motor por defecto.
                   Firma esperada: (hour: ForecastHour, spot: SpotConfig) -> ScoreBreakdown
+        ahora: Momento de referencia (UTC-aware) para el filtro de horas ya
+               pasadas. None = datetime.now(timezone.utc) (comportamiento de
+               producción). Inyectable para tests deterministas.
 
     Returns:
         BestHourResult con la mejor hora, o None si no hay datos.
@@ -72,11 +80,16 @@ def calcular_mejor_hora(
         # Fenómeno polar extremo — no debería ocurrir para LATAM
         return None
 
-    # Filtrar horas del día con luz solar
+    # Filtrar horas del día con luz solar que todavía no terminaron.
+    # Cada ForecastHour representa un bloque de 1h (mismo criterio que
+    # core/windows/detector.py) — se considera "todavía vigente" mientras
+    # su fin (timestamp + 1h) no haya pasado, no solo su inicio.
+    ahora = ahora if ahora is not None else datetime.now(timezone.utc)
     horas_del_dia = [
         h for h in forecast
         if h.timestamp.astimezone(tz).date() == fecha
         and is_daylight(h.timestamp, daylight)
+        and h.timestamp + timedelta(hours=1) > ahora
     ]
 
     if not horas_del_dia:

@@ -332,6 +332,46 @@ def test_weekly_mejor_ventana_semana():
             assert ventana.score_100 >= d.mejor_hora.score_100
 
 
+def test_weekly_excluye_horas_pasadas_de_hoy():
+    """
+    Regresión #11: analizar_semana() no debe promediar horas ya pasadas del
+    día de hoy, ni elegir una como "mejor hora" si hay una futura disponible
+    con score más bajo. Este es el efecto productivo original del hallazgo
+    (antes, calcular_mejor_hora() no filtraba contra 'ahora', y weekly.py lo
+    llama internamente para armar el promedio diario).
+
+    Usa 'ahora' inyectado (no el reloj real) para que el test sea
+    determinista sin depender de en qué fecha real corre.
+    """
+    tz = ZoneInfo("America/Argentina/Buenos_Aires")
+    ahora_mediodia = datetime(
+        FECHA.year, FECHA.month, FECHA.day, 12, 0, tzinfo=tz
+    ).astimezone(timezone.utc)
+
+    forecast_hoy = make_forecast_dias(FECHA, 1, scores_por_hora={9: 0.95, 15: 0.60})
+    sf = mock_score_fn(scores_dict(forecast_hoy))
+
+    result = analizar_semana(forecast_hoy, SPOT, score_fn=sf, ahora=ahora_mediodia)
+    assert result is not None
+
+    dia_hoy = result.scores_por_dia[0]
+    assert dia_hoy.fecha == FECHA
+    assert dia_hoy.tiene_datos is True
+
+    # La mejor hora debe ser la futura (15h, score 0.60), no la pasada (9h, score 0.95).
+    hora_local_mejor = dia_hoy.mejor_hora.hour.timestamp.astimezone(tz).hour
+    assert hora_local_mejor == 15, \
+        f"Debía elegir 15h (futura), no 9h (pasada con score más alto). Eligió {hora_local_mejor}h"
+
+    # La hora de las 9 no debe estar ni en el ranking del día ni contarse en horas_con_luz.
+    horas_en_ranking = [
+        rh.hour.timestamp.astimezone(tz).hour
+        for rh in dia_hoy.mejor_hora.todas_las_horas
+    ]
+    assert 9 not in horas_en_ranking, f"Hora pasada (9h) no debería estar en el ranking: {horas_en_ranking}"
+    assert dia_hoy.horas_con_luz == len(horas_en_ranking)
+
+
 def test_weekly_vacio():
     result = analizar_semana([], SPOT, score_fn=mock_score_fn({}))
     assert result is None
@@ -422,6 +462,7 @@ if __name__ == "__main__":
         test_weekly_peor_dia_tiene_menor_score,
         test_weekly_dias_buenos_threshold,
         test_weekly_mejor_ventana_semana,
+        test_weekly_excluye_horas_pasadas_de_hoy,
         test_weekly_vacio,
         test_weekly_max_dias_respetado,
         test_weekly_day_score_nombre_dia,

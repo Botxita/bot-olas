@@ -126,18 +126,37 @@ def scores_dict_from_forecast(forecast: List[ForecastHour]) -> dict:
     return {h.timestamp: getattr(h, '_test_score', 0.5) for h in forecast}
 
 
+def ahora_antes_del_amanecer(fecha: date, tz_str: str = "America/Argentina/Buenos_Aires") -> datetime:
+    """
+    Timestamp 'ahora' determinista para tests: medianoche local de 'fecha',
+    garantizado anterior a cualquier hora de luz solar de ese día.
+
+    calcular_mejor_hora() ahora filtra horas ya pasadas respecto de 'ahora'
+    (regresión #11) — sin esto, fixtures con fecha fija en el pasado (ej.
+    2025-01-15) quedarían con todas sus horas filtradas por comparación
+    contra el reloj real, rompiendo tests que no tienen nada que ver con
+    ese fix. Se inyecta explícitamente en vez de dejar el default
+    (datetime.now(timezone.utc)) para que estos tests no dependan del
+    momento real en que corren.
+    """
+    tz = ZoneInfo(tz_str)
+    medianoche_local = datetime(fecha.year, fecha.month, fecha.day, 0, 0, tzinfo=tz)
+    return medianoche_local.astimezone(timezone.utc)
+
+
 # ---------------------------------------------------------------------------
 # Tests de calcular_mejor_hora
 # ---------------------------------------------------------------------------
 
 FECHA_TEST = date(2025, 1, 15)  # Verano AR, muchas horas de luz
 SPOT_MDQ = make_spot()
+AHORA_TEST = ahora_antes_del_amanecer(FECHA_TEST)
 
 
 def test_mejor_hora_retorna_best_hour_result():
     forecast = make_forecast_dia(FECHA_TEST, scores_por_hora={8: 0.8, 10: 0.9, 14: 0.6})
     sf = mock_score_fn(scores_dict_from_forecast(forecast))
-    result = calcular_mejor_hora(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf)
+    result = calcular_mejor_hora(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf, ahora=AHORA_TEST)
     assert result is not None
     assert isinstance(result, BestHourResult)
 
@@ -148,7 +167,7 @@ def test_mejor_hora_elige_mayor_score():
     forecast = make_forecast_dia(FECHA_TEST, scores_por_hora=scores)
     sf = mock_score_fn(scores_dict_from_forecast(forecast))
 
-    result = calcular_mejor_hora(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf)
+    result = calcular_mejor_hora(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf, ahora=AHORA_TEST)
     assert result is not None
 
     tz = ZoneInfo("America/Argentina/Buenos_Aires")
@@ -162,7 +181,7 @@ def test_mejor_hora_score_100_consistente():
     forecast = make_forecast_dia(FECHA_TEST, scores_por_hora=scores)
     sf = mock_score_fn(scores_dict_from_forecast(forecast))
 
-    result = calcular_mejor_hora(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf)
+    result = calcular_mejor_hora(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf, ahora=AHORA_TEST)
     assert result is not None
     assert result.score_100 == result.breakdown.score_100
     assert result.score_100 == 78
@@ -172,7 +191,7 @@ def test_mejor_hora_rank_siempre_1():
     """rank_en_dia siempre debe ser 1 (es la mejor)."""
     forecast = make_forecast_dia(FECHA_TEST)
     sf = mock_score_fn(scores_dict_from_forecast(forecast))
-    result = calcular_mejor_hora(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf)
+    result = calcular_mejor_hora(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf, ahora=AHORA_TEST)
     assert result is not None
     assert result.rank_en_dia == 1
 
@@ -187,7 +206,7 @@ def test_mejor_hora_excluye_noche():
     forecast = make_forecast_dia(FECHA_TEST, scores_por_hora=scores)
     sf = mock_score_fn(scores_dict_from_forecast(forecast))
 
-    result = calcular_mejor_hora(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf)
+    result = calcular_mejor_hora(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf, ahora=AHORA_TEST)
     assert result is not None
 
     tz = ZoneInfo("America/Argentina/Buenos_Aires")
@@ -201,7 +220,7 @@ def test_mejor_hora_daylight_en_resultado():
     """BestHourResult debe incluir DaylightInfo válido."""
     forecast = make_forecast_dia(FECHA_TEST)
     sf = mock_score_fn(scores_dict_from_forecast(forecast))
-    result = calcular_mejor_hora(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf)
+    result = calcular_mejor_hora(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf, ahora=AHORA_TEST)
     assert result is not None
     assert result.daylight is not None
     assert result.daylight.fecha == FECHA_TEST
@@ -213,7 +232,7 @@ def test_mejor_hora_horas_evaluadas_solo_diurnas():
     """horas_evaluadas debe contar solo horas con luz solar."""
     forecast = make_forecast_dia(FECHA_TEST, horas=24)
     sf = mock_score_fn(scores_dict_from_forecast(forecast))
-    result = calcular_mejor_hora(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf)
+    result = calcular_mejor_hora(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf, ahora=AHORA_TEST)
     assert result is not None
     # En enero MDP hay ~13h de luz → entre 12 y 14 horas evaluadas
     assert 10 <= result.horas_evaluadas <= 16, \
@@ -225,13 +244,41 @@ def test_mejor_hora_todas_las_horas_ordenadas_por_score():
     scores = {8: 0.3, 10: 0.9, 12: 0.6, 14: 0.45}
     forecast = make_forecast_dia(FECHA_TEST, scores_por_hora=scores)
     sf = mock_score_fn(scores_dict_from_forecast(forecast))
-    result = calcular_mejor_hora(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf)
+    result = calcular_mejor_hora(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf, ahora=AHORA_TEST)
     assert result is not None
 
     ranked = result.todas_las_horas
     for i in range(1, len(ranked)):
         assert ranked[i].breakdown.score_total <= ranked[i-1].breakdown.score_total, \
             "todas_las_horas no está ordenado por score descendente"
+
+
+def test_mejor_hora_excluye_horas_ya_pasadas_de_hoy():
+    """
+    Regresión #11: si 'ahora' cae después de una hora con score alto pero
+    antes de otra con score más bajo, debe elegir la futura de score más
+    bajo, no la pasada de score más alto — no tiene sentido recomendar una
+    ventana horaria que ya no se puede usar.
+    """
+    scores = {9: 0.95, 15: 0.60}  # 9h tiene mejor score, pero va a quedar en el pasado
+    forecast = make_forecast_dia(FECHA_TEST, scores_por_hora=scores)
+    sf = mock_score_fn(scores_dict_from_forecast(forecast))
+
+    tz = ZoneInfo("America/Argentina/Buenos_Aires")
+    ahora_mediodia = datetime(
+        FECHA_TEST.year, FECHA_TEST.month, FECHA_TEST.day, 12, 0, tzinfo=tz
+    ).astimezone(timezone.utc)
+
+    result = calcular_mejor_hora(forecast, SPOT_MDQ, FECHA_TEST, score_fn=sf, ahora=ahora_mediodia)
+    assert result is not None
+
+    hora_local = result.hour.timestamp.astimezone(tz).hour
+    assert hora_local == 15, \
+        f"Debía elegir la hora futura (15h), no la pasada con score más alto (9h). Eligió {hora_local}h"
+
+    # La hora de las 9 (ya pasada respecto de 'ahora') no debe estar ni siquiera en el ranking evaluado.
+    horas_evaluadas = [rh.hour.timestamp.astimezone(tz).hour for rh in result.todas_las_horas]
+    assert 9 not in horas_evaluadas, f"La hora pasada (9h) no debería estar en el ranking: {horas_evaluadas}"
 
 
 def test_mejor_hora_forecast_vacio():
@@ -260,8 +307,14 @@ def test_mejor_hora_invierno_menos_horas():
     sf_inv = mock_score_fn(scores_dict_from_forecast(forecast_inv))
     sf_ver = mock_score_fn(scores_dict_from_forecast(forecast_ver))
 
-    result_inv = calcular_mejor_hora(forecast_inv, SPOT_MDQ, fecha_invierno, score_fn=sf_inv)
-    result_ver = calcular_mejor_hora(forecast_ver, SPOT_MDQ, fecha_verano, score_fn=sf_ver)
+    result_inv = calcular_mejor_hora(
+        forecast_inv, SPOT_MDQ, fecha_invierno, score_fn=sf_inv,
+        ahora=ahora_antes_del_amanecer(fecha_invierno),
+    )
+    result_ver = calcular_mejor_hora(
+        forecast_ver, SPOT_MDQ, fecha_verano, score_fn=sf_ver,
+        ahora=ahora_antes_del_amanecer(fecha_verano),
+    )
 
     assert result_inv is not None
     assert result_ver is not None
@@ -276,7 +329,10 @@ def test_mejor_hora_timezone_brasil():
     forecast = make_forecast_dia(fecha, tz_str="America/Sao_Paulo",
                                   scores_por_hora={9: 0.85, 14: 0.6})
     sf = mock_score_fn(scores_dict_from_forecast(forecast))
-    result = calcular_mejor_hora(forecast, spot_br, fecha, score_fn=sf)
+    result = calcular_mejor_hora(
+        forecast, spot_br, fecha, score_fn=sf,
+        ahora=ahora_antes_del_amanecer(fecha, tz_str="America/Sao_Paulo"),
+    )
     assert result is not None
     tz = ZoneInfo("America/Sao_Paulo")
     hora_local = result.hour.timestamp.astimezone(tz).hour
@@ -290,7 +346,10 @@ def test_mejor_hora_timezone_costa_rica():
     forecast = make_forecast_dia(fecha, tz_str="America/Costa_Rica",
                                   scores_por_hora={7: 0.9, 12: 0.5})
     sf = mock_score_fn(scores_dict_from_forecast(forecast))
-    result = calcular_mejor_hora(forecast, spot_cr, fecha, score_fn=sf)
+    result = calcular_mejor_hora(
+        forecast, spot_cr, fecha, score_fn=sf,
+        ahora=ahora_antes_del_amanecer(fecha, tz_str="America/Costa_Rica"),
+    )
     assert result is not None
 
 
@@ -434,6 +493,7 @@ if __name__ == "__main__":
         test_mejor_hora_daylight_en_resultado,
         test_mejor_hora_horas_evaluadas_solo_diurnas,
         test_mejor_hora_todas_las_horas_ordenadas_por_score,
+        test_mejor_hora_excluye_horas_ya_pasadas_de_hoy,
         test_mejor_hora_forecast_vacio,
         test_mejor_hora_fecha_sin_datos,
         test_mejor_hora_invierno_menos_horas,

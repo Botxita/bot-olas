@@ -9,7 +9,7 @@ No depende de: bot/, telegram, IO, red.
 """
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 
 from core.scoring.models import ForecastHour, SpotConfig
@@ -72,6 +72,7 @@ def analizar_semana(
     spot: SpotConfig,
     score_fn=None,
     max_dias: int = 7,
+    ahora: Optional[datetime] = None,
 ) -> Optional[WeeklyAnalysis]:
     """
     Analiza hasta 7 días de forecast desde HOY y retorna el ranking semanal.
@@ -81,6 +82,13 @@ def analizar_semana(
         spot: SpotConfig con lat, lon, tz.
         score_fn: Función de scoring inyectable.
         max_dias: Cuántos días analizar (default 7).
+        ahora: Momento de referencia (UTC-aware) para determinar "hoy" y
+               para excluir horas ya pasadas del día de hoy (ver
+               calcular_mejor_hora). None = datetime.now(timezone.utc)
+               (comportamiento de producción). Una única lectura de reloj
+               se usa para ambos filtros — evita que dos lecturas
+               independientes del reloj real diverjan cerca de medianoche.
+               Inyectable para tests deterministas.
 
     Returns:
         WeeklyAnalysis con scores por día y mejor día, o None si no hay datos.
@@ -90,9 +98,10 @@ def analizar_semana(
         return None
 
     tz = spot.get_zoneinfo()
+    ahora = ahora if ahora is not None else datetime.now(timezone.utc)
 
     # Solo fechas desde hoy en adelante (sin días pasados)
-    hoy = datetime.now(tz).date()
+    hoy = ahora.astimezone(tz).date()
     fechas_disponibles = sorted({
         h.timestamp.astimezone(tz).date()
         for h in forecast
@@ -105,7 +114,7 @@ def analizar_semana(
     scores_por_dia: List[DayScore] = []
 
     for fecha in fechas_disponibles:
-        day_score = _analizar_dia(forecast, spot, fecha, score_fn, tz)
+        day_score = _analizar_dia(forecast, spot, fecha, score_fn, tz, ahora)
         scores_por_dia.append(day_score)
 
     # Filtrar días con datos para calcular mejor/peor
@@ -136,11 +145,13 @@ def _analizar_dia(
     fecha: date,
     score_fn,
     tz,
+    ahora: Optional[datetime] = None,
 ) -> DayScore:
     """Calcula el DayScore para un día específico."""
 
-    # Calcular mejor hora (que internamente filtra por luz y calcula scores)
-    mejor_hora = calcular_mejor_hora(forecast, spot, fecha, score_fn=score_fn)
+    # Calcular mejor hora (que internamente filtra por luz, por horas ya
+    # pasadas si 'fecha' es hoy, y calcula scores)
+    mejor_hora = calcular_mejor_hora(forecast, spot, fecha, score_fn=score_fn, ahora=ahora)
 
     if mejor_hora is None:
         return DayScore(

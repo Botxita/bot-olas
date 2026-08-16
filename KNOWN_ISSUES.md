@@ -2,7 +2,7 @@
 
 Documento vivo de auditoría de fondo sobre `core/` (scoring, analysis, windows) y, desde el hallazgo #32, sobre **calidad de datos geográficos** de `config/spots/*.json`. Generado a partir de una revisión conjunta Claude Code + Codex (auditor independiente, ver `AGENTS.md`).
 
-**Estado (actualizado tras 3 rondas de fixes de código + 1 ronda de auditoría de datos + fixes de datos verificados por Ivan en Google Maps):** de los **55 hallazgos documentados** (31 de código + 24 de datos geográficos), **19 fueron corregidos** — 13 de código en 3 grupos priorizados por Ivan, más 6 de datos geográficos (#33, #34, #41, #43, #44, #47) que Ivan verificó personalmente contra Google Maps antes de aplicar. #45 fue verificado y confirmado que **no** necesita corrección. Un "grupo confiable" adicional (#32, #37-40, #50, #51 — orientaciones y coordenadas estimadas por Codex, sin verificación cartográfica) está aplicado en el working tree pero **todavía sin commitear**, esperando OK final. El resto (#35, #36, #42, #46, #48, #49, #52-55) sigue como auditoría sin aplicar — ver advertencia de confiabilidad en esa sección antes de actuar. Los demás hallazgos de código sin marcar (#2, #6-#8, #14-#21, #25-#29, #31) también siguen abiertos.
+**Estado (actualizado tras 3 rondas de fixes de código + 1 ronda de auditoría de datos + fixes de datos verificados por Ivan en Google Maps):** de los **55 hallazgos documentados** (31 de código + 24 de datos geográficos), **23 fueron corregidos** — 13 de código en 3 grupos priorizados por Ivan, más 10 de datos geográficos (#33, #34, #41, #43, #44, #46, #47, #48, #49, #53) que Ivan verificó personalmente contra Google Maps antes de aplicar. #45 fue verificado y confirmado que **no** necesita corrección. #36 y #54 fueron investigados pero la evidencia encontrada no fue concluyente (marcados `🔍 VERIFICADO — EVIDENCIA INSUFICIENTE`, distinto de resuelto o sin tocar). Un "grupo confiable" adicional (#32, #37-40, #50, #51 — orientaciones y coordenadas estimadas por Codex, sin verificación cartográfica) está aplicado en el working tree pero **todavía sin commitear**, esperando OK final. El resto (#35, #42, #52, #55) sigue como auditoría sin aplicar — ver advertencia de confiabilidad en esa sección antes de actuar. Los demás hallazgos de código sin marcar (#2, #6-#8, #14-#21, #25-#29, #31) también siguen abiertos.
 
 - **Grupo 1** (`fix-grupo1-scoring-critico`): #5, #12, #22.
 - **Grupo 2** (`fix-grupo2-analisis-y-detector`): #1, #3, #4, #11, #23, #24.
@@ -311,6 +311,8 @@ Severidad (distinta a la de `core/`, adaptada a datos geográficos):
 
 ### 36. `pico_alto` — coordenadas demasiado cerca de la costa para un reef break offshore — **media**
 
+**🔍 VERIFICADO — EVIDENCIA INSUFICIENTE PARA CORREGIR.** Ivan investigó en Google Maps pero la búsqueda encontró un hotel llamado "Pico Alto", no el break real — no hay coordenada confiable todavía. Distinto de "resuelto" (nada se aplicó) y de "sin verificar" (sí se investigó, sin resultado utilizable). Sigue con las coordenadas originales de abajo.
+
 - Pico Alto es una rompiente mar adentro; `-12.3380, -76.8250` parece estar dentro del conjunto urbano/playas de Punta Hermosa, no sobre el pico real. Estimación de Codex: `~-12.33/-12.34, -76.835/-76.84`.
 - `orientacion_costa_deg=270` es dudoso para un reef offshore — su exposición real depende de la geometría del arrecife, no de una costa genérica.
 
@@ -367,6 +369,8 @@ Severidad (distinta a la de `core/`, adaptada a datos geográficos):
 
 ### 46. `barra_ibiraquera` — coordenadas demasiado al norte del spot real — **media**
 
+**✅ RESUELTO** — aplicado en el mismo commit que esta actualización de KNOWN_ISSUES.md. Ivan verificó contra Google Maps: `lat -28.152467, lon -48.649614`.
+
 - `-28.1000, -48.6400` cae en el entorno Ouvidor/Rosa norte, no en la barra de la Lagoa de Ibiraquera (que está al sur de Praia do Rosa). Estimación de Codex: `~-28.15/-28.16, -48.64/-48.66`.
 
 ### 47. `silveira` — latitud no respeta el orden geográfico real del cluster Garopaba/Imbituba — **media**
@@ -378,9 +382,13 @@ Severidad (distinta a la de `core/`, adaptada a datos geográficos):
 
 ### 48. `floripa_joaquina` — coordenadas parecen caer tierra adentro (dunas/interior de la isla) — **media**
 
+**✅ RESUELTO** — aplicado en el mismo commit que esta actualización de KNOWN_ISSUES.md. Ivan verificó contra Google Maps: `lat -27.6295, lon -48.4490`.
+
 - `-27.6428, -48.4736` no corresponde a la línea de rompiente de Joaquina, que está más al norte y al este. Estimación de Codex: `~-27.62/-27.64, -48.44/-48.46`.
 
 ### 49. `floripa_praia_mole` — longitud parece ~1.5-2km tierra adentro — **media**
+
+**✅ RESUELTO** — aplicado en el mismo commit que esta actualización de KNOWN_ISSUES.md. Ivan verificó contra Google Maps: `lat -27.6029, lon -48.4330`.
 
 - `lon=-48.4530` — Codex estima la playa real más cerca de `-48.43/-48.44`.
 - Latitud correcta.
@@ -402,10 +410,14 @@ Severidad (distinta a la de `core/`, adaptada a datos geográficos):
 
 ### 53. `praia_do_rosa` — sospechoso, longitud posiblemente corrida al oeste — **baja (sin confirmar)**
 
+**✅ RESUELTO** — aplicado en el mismo commit que esta actualización de KNOWN_ISSUES.md. Ivan verificó contra Google Maps: `lat -28.1301, lon -48.6421`.
+
 - `lon=-48.6600` podría caer algo al oeste de la playa real (área urbana/lagunar) — Codex estima `~-48.64/-48.65`, pero lo marca "requiere mapa".
 - Codex confirma explícitamente que la secuencia norte-sur respecto a Ferrugem es correcta (no están intercambiadas entre sí).
 
 ### 54. `floripa_campeche` — coordenadas podrían representar el barrio/acceso, no la línea de rompiente — **baja (sin confirmar)**
+
+**🔍 VERIFICADO — EVIDENCIA INSUFICIENTE PARA CORREGIR.** Ivan investigó en Google Maps pero la búsqueda encontró el centro del barrio de Campeche, no la playa/rompiente específica — no hay coordenada confiable todavía. Sigue con las coordenadas originales de abajo.
 
 - `-27.6875, -48.4900` está en el sector correcto según Codex, pero Campeche es una playa extensa — podría convenir elegir un pico concreto más al este (`~-48.47/-48.48`) en vez del punto de acceso general.
 

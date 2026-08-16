@@ -141,16 +141,30 @@ def detectar_ventanas(
     if current_window:
         ventanas_raw.append(current_window)
 
-    # Construir VentanaOptima para cada grupo
+    # Construir VentanaOptima para cada grupo, recortando primero las horas
+    # cuyo bloque ya terminó. Una ventana "en curso" (empezó antes de ahora,
+    # termina después) debe reflejar solo la porción vigente — antes, una
+    # ventana 10:00-14:00 consultada a las 12:30 seguía mostrando
+    # score_promedio/score_max/hora_pico calculados con las horas 10:00 y
+    # 11:00 ya pasadas, como si todavía formaran parte de la recomendación.
+    # Recortar el grupo ANTES de construir la ventana (en vez de filtrar
+    # después por v.fin > ahora) resuelve ambos problemas con un solo
+    # cambio: una ventana totalmente pasada queda con group_vigente vacío
+    # y se descarta (mismo efecto que el filtro viejo), y una ventana
+    # parcialmente pasada recalcula todos sus campos solo con las horas
+    # que quedan.
+    ahora = datetime.now(timezone.utc)
     ventanas = []
     for group in ventanas_raw:
-        ventana = _construir_ventana(group, spot)
+        group_vigente = [
+            (h, bd) for h, bd in group
+            if h.timestamp + timedelta(hours=1) > ahora
+        ]
+        if not group_vigente:
+            continue
+        ventana = _construir_ventana(group_vigente, spot)
         if ventana:
             ventanas.append(ventana)
-
-    # Filtrar ventanas que ya terminaron
-    now = datetime.now(timezone.utc)
-    ventanas = [v for v in ventanas if v.fin > now]
 
     # Ordenar por score promedio descendente y retornar top N
     ventanas.sort(key=lambda v: v.score_promedio, reverse=True)

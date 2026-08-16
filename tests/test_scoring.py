@@ -11,6 +11,7 @@ import sys
 import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 # Agregar el root al path para importar módulos
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -713,6 +714,61 @@ class TestDetectorVentanas(unittest.TestCase):
                 any(v.inicio == ts_ok for v in ventanas),
                 f"La hora que sí calculó score ({ts_ok}) debería formar una ventana: {ventanas}",
             )
+
+    def test_ventana_en_curso_recorta_horas_ya_pasadas(self):
+        """
+        Regresión #24: una ventana que ya empezó pero todavía no terminó
+        debe recalcular promedio/hora_pico/inicio solo con las horas
+        vigentes, no con las que ya pasaron. Antes, una ventana 10:00-14:00
+        consultada a las 12:30 seguía mostrando estadísticas calculadas con
+        las horas 10:00 y 11:00, ya terminadas.
+
+        Usa un reloj fijo (mock sobre core.windows.detector.datetime) para
+        poder construir horas "pasadas" y "futuras" de forma determinista,
+        sin depender de la hora real de ejecución del test.
+        """
+        class _RelojFijo(datetime):
+            _ahora = None
+
+            @classmethod
+            def now(cls, tz=None):
+                return cls._ahora.astimezone(tz) if tz else cls._ahora
+
+        tz = ZoneInfo("America/Argentina/Buenos_Aires")
+        # 2025-06-15 es invierno en AR pero 10-13h local sigue siendo de día
+        # (sunrise invierno MDP ~08:00-08:30).
+        base_local = datetime(2025, 6, 15, 10, 0, tzinfo=tz)  # 10:00 local
+        _RelojFijo._ahora = datetime(2025, 6, 15, 12, 30, tzinfo=tz).astimezone(timezone.utc)  # ahora = 12:30 local
+
+        spot = make_spot()
+        # 10:00 tiene las mejores condiciones (dirección de swell perfecta);
+        # 11:00-13:00 son buenas pero no óptimas — si el pico quedara mal
+        # calculado, elegiría 10:00 (ya pasada) en vez de una hora vigente.
+        cond_pico = dict(altura=1.4, periodo=14, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0)
+        cond_buena = dict(altura=1.2, periodo=12, dir_swell=115, vel_viento=10, dir_viento=275, nivel_marea=1.0)
+        horas_ts = [base_local.astimezone(timezone.utc) + timedelta(hours=h) for h in range(4)]
+        forecast = [
+            make_hour(ts=horas_ts[0], **cond_pico),
+            make_hour(ts=horas_ts[1], **cond_buena),
+            make_hour(ts=horas_ts[2], **cond_buena),
+            make_hour(ts=horas_ts[3], **cond_buena),
+        ]
+
+        with patch("core.windows.detector.datetime", _RelojFijo):
+            ventanas = detectar_ventanas(forecast, spot, umbral=0.30)
+
+        self.assertEqual(len(ventanas), 1, f"Esperaba una sola ventana: {ventanas}")
+        ventana = ventanas[0]
+
+        # Las horas 10:00 y 11:00 (bloque termina a las 11:00 y 12:00,
+        # ambos <= ahora=12:30) ya pasaron — no deben contarse.
+        self.assertEqual(ventana.horas_count, 2, "Deberían quedar solo las 2 horas vigentes (12:00 y 13:00)")
+        self.assertEqual(ventana.inicio, horas_ts[2], "inicio debería recalcularse a la primera hora vigente (12:00)")
+        self.assertNotEqual(
+            ventana.hora_pico, horas_ts[0],
+            "hora_pico no debería ser la hora ya pasada (10:00), aunque tenga el mejor score",
+        )
+        self.assertIn(ventana.hora_pico, (horas_ts[2], horas_ts[3]))
 
 
 if __name__ == "__main__":

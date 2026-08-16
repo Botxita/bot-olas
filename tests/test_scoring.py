@@ -48,6 +48,9 @@ def make_spot(
     marea_max=1.6,
     marea_tipo_efecto="mid_better",
     direcciones_ideales=None,
+    swell_periodo_min=7.0,
+    viento_max_offshore=35.0,
+    viento_max_onshore=15.0,
 ) -> SpotConfig:
     return SpotConfig(
         key="test_varese",
@@ -66,9 +69,9 @@ def make_spot(
         marea_tipo_efecto=marea_tipo_efecto,
         swell_altura_min=0.5,
         swell_altura_max=3.0,
-        swell_periodo_min=7.0,
-        viento_max_offshore=35.0,
-        viento_max_onshore=15.0,
+        swell_periodo_min=swell_periodo_min,
+        viento_max_offshore=viento_max_offshore,
+        viento_max_onshore=viento_max_onshore,
         direcciones_ideales=direcciones_ideales or [],
     )
 
@@ -139,6 +142,42 @@ class TestPeriodo(unittest.TestCase):
         scores = [_score_periodo(t) for t in [4, 7, 10, 13, 16]]
         for i in range(len(scores) - 1):
             self.assertLessEqual(scores[i], scores[i+1])
+
+    def test_periodo_min_default_preserva_curva_original(self):
+        """periodo_min=7.0 (default de la función, ancla de la curva) debe
+        dar exactamente el mismo resultado que no pasar el parámetro."""
+        for T in [4, 6, 8, 10, 13, 16, 18]:
+            self.assertEqual(_score_periodo(T), _score_periodo(T, periodo_min=7.0))
+
+    def test_periodo_igual_a_periodo_min_entra_en_usable(self):
+        """
+        Regresión #3 (parte del hallazgo de Codex): T == periodo_min debe
+        caer en el balde "usable" (0.55), no en "windchop" (0.30) —
+        independientemente de qué tan alto sea periodo_min. Un ancla mal
+        elegida (ej. en el default del registry, 6.0) hacía que T==periodo_min
+        cayera siempre en 0.30 para cualquier spot que sí especifica el campo.
+        """
+        for periodo_min in (5.0, 7.0, 9.0, 12.0, 15.0):
+            self.assertAlmostEqual(
+                _score_periodo(periodo_min, periodo_min=periodo_min), 0.55, delta=0.001,
+                msg=f"periodo_min={periodo_min}",
+            )
+
+    def test_periodo_min_mas_alto_penaliza_el_mismo_periodo(self):
+        """
+        Regresión #3: un reef con periodo_min más alto que el estándar debe
+        considerar windchop un período que un spot estándar consideraría usable.
+        """
+        T = 8.0
+        s_estandar = _score_periodo(T, periodo_min=7.0)
+        s_reef_exigente = _score_periodo(T, periodo_min=11.0)
+        self.assertLess(s_reef_exigente, s_estandar)
+
+    def test_periodo_min_mas_bajo_favorece_el_mismo_periodo(self):
+        T = 8.0
+        s_estandar = _score_periodo(T, periodo_min=7.0)
+        s_tolerante = _score_periodo(T, periodo_min=4.0)
+        self.assertGreater(s_tolerante, s_estandar)
 
 
 class TestDireccionSwell(unittest.TestCase):
@@ -212,6 +251,38 @@ class TestViento(unittest.TestCase):
         wind = WindData(velocidad_kmh=30, rafaga_kmh=40, direccion_deg=90)
         s = _score_viento(wind, orientacion_costa=95)
         self.assertLess(s, 0.20)
+
+    def test_defaults_preservan_curva_original(self):
+        """viento_max_offshore=40.0/viento_max_onshore=15.0 (defaults del
+        registry) deben dar exactamente el mismo resultado que no pasar
+        los parámetros."""
+        wind_off = WindData(velocidad_kmh=20, rafaga_kmh=25, direccion_deg=275)
+        wind_on = WindData(velocidad_kmh=12, rafaga_kmh=16, direccion_deg=90)
+        self.assertEqual(
+            _score_viento(wind_off, orientacion_costa=95),
+            _score_viento(wind_off, orientacion_costa=95, viento_max_offshore=40.0),
+        )
+        self.assertEqual(
+            _score_viento(wind_on, orientacion_costa=95),
+            _score_viento(wind_on, orientacion_costa=95, viento_max_onshore=15.0),
+        )
+
+    def test_viento_max_onshore_mas_bajo_penaliza_mas(self):
+        """
+        Regresión #3: un spot expuesto (viento_max_onshore bajo, ej.
+        Necochea con 10 km/h) debe penalizar el mismo onshore más que un
+        spot tolerante (ej. 18 km/h) — hoy ambos recibían el mismo score.
+        """
+        wind = WindData(velocidad_kmh=9, rafaga_kmh=13, direccion_deg=90)
+        s_expuesto = _score_viento(wind, orientacion_costa=95, viento_max_onshore=10.0)
+        s_tolerante = _score_viento(wind, orientacion_costa=95, viento_max_onshore=18.0)
+        self.assertLess(s_expuesto, s_tolerante)
+
+    def test_viento_max_offshore_mas_bajo_penaliza_mas(self):
+        wind = WindData(velocidad_kmh=20, rafaga_kmh=25, direccion_deg=275)
+        s_bajo = _score_viento(wind, orientacion_costa=95, viento_max_offshore=25.0)
+        s_alto = _score_viento(wind, orientacion_costa=95, viento_max_offshore=50.0)
+        self.assertLess(s_bajo, s_alto)
 
     def test_tipo_viento_offshore(self):
         tipo = _tipo_viento(dir_viento=280, orientacion_costa=90)
@@ -377,6 +448,39 @@ class TestScoreTotal(unittest.TestCase):
         s_reef = calcular_score(hour_windchop, reef)
         # Reef da más peso al período → score más bajo con windchop
         self.assertLessEqual(s_reef.score_100, s_beach.score_100 + 5)
+
+    def test_periodo_min_alto_coherente_entre_score_y_flags(self):
+        """
+        Regresión #3 (coherencia score/flags): un reef exigente
+        (periodo_min=15, como pidió Codex de ejemplo) con un período de 14s
+        —que en un spot estándar sería "groundswell largo"— debe quedar con
+        score bajo (windchop para ESTE spot) y el flag debe decir eso, no
+        "Groundswell largo".
+        """
+        reef_exigente = make_spot(tipo_break="reef", swell_periodo_min=15.0)
+        hour = make_hour(altura=1.2, periodo=14, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0)
+        bd = calcular_score(hour, reef_exigente)
+
+        self.assertLess(bd.score_periodo, 0.40)
+        flags_texto = " ".join(bd.flags_positivos + bd.flags_negativos + bd.flags_neutros)
+        self.assertNotIn("Groundswell largo", flags_texto)
+        self.assertTrue(
+            any("corto" in f or "windchop" in f for f in bd.flags_negativos),
+            f"Esperaba un flag negativo de período corto/windchop, flags: {bd.flags_negativos}",
+        )
+
+    def test_viento_max_offshore_bajo_coherente_entre_score_y_flags(self):
+        """Un spot expuesto (viento_max_offshore=20) con offshore de 18 km/h
+        —"limpio" en un spot estándar— debe quedar con score intermedio
+        (no el tope de 0.98) y el flag debe decir "fuerte", no "limpio"."""
+        spot_expuesto = make_spot(viento_max_offshore=20.0)
+        hour = make_hour(altura=1.2, periodo=12, dir_swell=95, vel_viento=18, dir_viento=275, nivel_marea=1.0)
+        bd = calcular_score(hour, spot_expuesto)
+
+        self.assertLess(bd.score_viento, 0.90)
+        flags_texto = " ".join(bd.flags_positivos + bd.flags_negativos + bd.flags_neutros)
+        self.assertNotIn("Offshore limpio", flags_texto)
+        self.assertIn("fuerte", flags_texto)
 
 
 # ------------------------------------------------------------------

@@ -60,20 +60,35 @@ def _score_energia(energia: float, escala: float = 50.0) -> float:
 # Capa 2 — Período
 # ---------------------------------------------------------------------------
 
-def _score_periodo(T: float) -> float:
+def _score_periodo(T: float, periodo_min: float = 7.0) -> float:
     """
-    Curve de calidad basada en período.
+    Curva de calidad basada en período, desplazada según periodo_min del
+    spot (swell_periodo_min en config/spots/*.json) — un reef que solo
+    funciona con groundswell largo necesita más período que un beach break
+    tolerante a windchop corto; no es un umbral universal.
+
+    El ancla es 7.0 — el punto donde la curva original pasa de "windchop"
+    (0.30) a "usable" (0.55) — así T == periodo_min siempre cae justo en la
+    entrada del rango "usable" (0.55), independientemente de qué tan alto o
+    bajo sea periodo_min. No se ancla en el default del registry (6.0): ese
+    fallback solo cubre 1 de 59 spots reales, y anclar ahí hacía que
+    T == periodo_min cayera siempre en el balde "windchop" (0.30) para
+    cualquier spot que sí especifica el campo — justo lo contrario de lo
+    que "período mínimo" debería significar.
+
+    Con periodo_min=7.0 la curva queda idéntica a la original:
     < 7s  → windchop desordenado
     7–10s → corto, usable
     10–14s → bueno
     > 14s → groundswell puro
     """
-    if T < 5:   return 0.10
-    if T < 7:   return 0.30
-    if T < 9:   return 0.55
-    if T < 11:  return 0.72
-    if T < 14:  return 0.88
-    if T < 17:  return 0.97
+    offset = periodo_min - 7.0
+    if T < 5 + offset:   return 0.10
+    if T < 7 + offset:   return 0.30
+    if T < 9 + offset:   return 0.55
+    if T < 11 + offset:  return 0.72
+    if T < 14 + offset:  return 0.88
+    if T < 17 + offset:  return 0.97
     return 1.0
 
 
@@ -161,7 +176,25 @@ def _tipo_viento(dir_viento: float, orientacion_costa: float) -> str:
         return "onshore"
 
 
-def _score_viento(wind: WindData, orientacion_costa: float) -> float:
+def _score_viento(
+    wind: WindData,
+    orientacion_costa: float,
+    viento_max_offshore: float = 40.0,
+    viento_max_onshore: float = 15.0,
+) -> float:
+    """
+    Score de viento, con los escalones de offshore/onshore escalados según
+    los límites del spot (viento_max_offshore/viento_max_onshore en
+    config/spots/*.json) — un spot expuesto tolera menos onshore que uno
+    protegido, y eso hoy es un dato de config, no algo que el motor deba
+    ignorar.
+
+    Los defaults (40.0 offshore, 15.0 onshore) son los mismos que usa el
+    registry cuando el spot no los especifica — con esos valores el factor
+    de escala es 1.0 y los escalones quedan idénticos a los originales.
+    Viento cross no tiene campo de config específico, queda con la curva
+    global sin escalar.
+    """
     tipo = _tipo_viento(wind.direccion_deg, orientacion_costa)
     vel = wind.velocidad_kmh
 
@@ -169,16 +202,18 @@ def _score_viento(wind: WindData, orientacion_costa: float) -> float:
         return 1.0   # Calmo: siempre perfecto
 
     if tipo == "offshore":
-        if vel < 15: return 0.98
-        if vel < 25: return 0.90
-        if vel < 35: return 0.78
-        if vel < 50: return 0.60
+        k = viento_max_offshore / 40.0
+        if vel < 15 * k: return 0.98
+        if vel < 25 * k: return 0.90
+        if vel < 35 * k: return 0.78
+        if vel < 50 * k: return 0.60
         return 0.40  # Offshore muy fuerte: dificultad para remar
 
     if tipo == "onshore":
-        if vel < 10: return 0.55
-        if vel < 20: return 0.30
-        if vel < 30: return 0.15
+        k = viento_max_onshore / 15.0
+        if vel < 10 * k: return 0.55
+        if vel < 20 * k: return 0.30
+        if vel < 30 * k: return 0.15
         return 0.05  # Onshore fuerte: olas destruidas
 
     # cross
@@ -268,23 +303,28 @@ def _generar_flags(
     negativos = []
     neutros = []
 
-    # Período
-    if swell.periodo_s >= 14:
+    # Período — umbrales desplazados por periodo_min del spot, mismo ancla
+    # (7.0) que usa _score_periodo(), para que el texto no contradiga el score.
+    periodo_offset = spot.swell_periodo_min - 7.0
+    if swell.periodo_s >= 14 + periodo_offset:
         positivos.append(f"Groundswell largo ({swell.periodo_s:.0f}s)")
-    elif swell.periodo_s >= 10:
+    elif swell.periodo_s >= 10 + periodo_offset:
         positivos.append(f"Período decente ({swell.periodo_s:.0f}s)")
-    elif swell.periodo_s < 7:
+    elif swell.periodo_s < 7 + periodo_offset:
         negativos.append(f"Período muy corto ({swell.periodo_s:.0f}s) — windchop")
 
-    # Viento
+    # Viento — umbrales escalados por los límites del spot, mismo factor
+    # (k = max_spot / default) que usa _score_viento().
     tipo_v = _tipo_viento(wind.direccion_deg, spot.orientacion_costa_deg)
+    k_offshore = spot.viento_max_offshore / 40.0
+    k_onshore = spot.viento_max_onshore / 15.0
     if tipo_v == "offshore":
-        if wind.velocidad_kmh < 20:
+        if wind.velocidad_kmh < 20 * k_offshore:
             positivos.append(f"Offshore limpio ({wind.velocidad_kmh:.0f} km/h)")
         else:
             positivos.append(f"Offshore (fuerte, {wind.velocidad_kmh:.0f} km/h)")
     elif tipo_v == "onshore":
-        if wind.velocidad_kmh > 20:
+        if wind.velocidad_kmh >= 20 * k_onshore:
             negativos.append(f"Onshore fuerte ({wind.velocidad_kmh:.0f} km/h)")
         else:
             negativos.append(f"Onshore ({wind.velocidad_kmh:.0f} km/h)")
@@ -364,10 +404,13 @@ def calcular_score(hour: ForecastHour, spot: SpotConfig) -> ScoreBreakdown:
     # Calcular sub-scores
     energia = _energia_proxy(swell_ajustado)
     s_energia = _score_energia(energia, escala_energia)
-    s_periodo = _score_periodo(swell_ajustado.periodo_s)
+    s_periodo = _score_periodo(swell_ajustado.periodo_s, spot.swell_periodo_min)
     diff_dir = _mejor_diff_direccion(swell_ajustado.direccion_deg, spot)
     s_dir = _score_dir_swell(diff_dir, spot.tolerancia_swell_deg)
-    s_viento = _score_viento(hour.wind, spot.orientacion_costa_deg)
+    s_viento = _score_viento(
+        hour.wind, spot.orientacion_costa_deg,
+        spot.viento_max_offshore, spot.viento_max_onshore,
+    )
     s_marea = _score_marea(hour.tide, spot)
 
     # Score total ponderado

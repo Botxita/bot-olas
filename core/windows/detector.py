@@ -93,13 +93,30 @@ def detectar_ventanas(
 
     # Calcular score para cada hora diurna
     scored: List[tuple] = []  # (ForecastHour, ScoreBreakdown)
+    errores_score = 0
     for hour in forecast_diurno:
         try:
             breakdown = calcular_score(hour, spot)
             scored.append((hour, breakdown))
         except Exception as e:
             logger.warning("Error calculando score para %s: %s", hour.timestamp, e)
+            errores_score += 1
             continue
+
+    # Si TODAS las horas fallaron al calcular score (ej. config de spot
+    # inválida — tolerancia_swell_deg=0, marea_max_m <= marea_min_m, etc.),
+    # devolver [] es indistinguible de "no hay condiciones buenas" para el
+    # caller. Se propaga como excepción: los handlers de bot/handlers/main.py
+    # ya envuelven detectar_ventanas() en un try/except genérico que muestra
+    # un mensaje de error legible (formato_no_disponible) en vez de la
+    # sección de ventanas vacía — no hace falta tocar el handler.
+    # Fallos aislados de horas puntuales (no todas) se siguen ignorando
+    # en silencio, como antes: son datos parciales, no un error sistémico.
+    if forecast_diurno and errores_score == len(forecast_diurno):
+        raise RuntimeError(
+            f"No se pudo calcular el score en ninguna de las {errores_score} horas "
+            f"evaluadas para el spot '{spot.key}' — posible config de spot inválida."
+        )
 
     # Agrupar en ventanas contiguas por encima del umbral.
     # Corte adicional cuando cambia el día local (evita ventanas que cruzan medianoche).

@@ -10,6 +10,7 @@ import os
 import sys
 import unittest
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 # Agregar el root al path para importar módulos
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -665,6 +666,53 @@ class TestDetectorVentanas(unittest.TestCase):
         # Con el fixture no hay "ahora real", pero debe retornar algo
         self.assertIsNotNone(hour)
         self.assertIsNotNone(bd)
+
+    def test_todas_las_horas_fallan_score_lanza_excepcion(self):
+        """
+        Regresión #23: si calcular_score() falla para TODAS las horas
+        evaluadas (ej. config de spot rota), detectar_ventanas() no debe
+        devolver [] silenciosamente —indistinguible de "no hay condiciones
+        buenas"— sino propagar el error. Los handlers de bot/handlers/main.py
+        ya envuelven detectar_ventanas() en un try/except genérico que
+        muestra un mensaje de error legible en ese caso.
+        """
+        spot = make_spot()
+        ahora = datetime.now(timezone.utc)
+        ts = (ahora + timedelta(days=1)).replace(hour=15, minute=0, second=0, microsecond=0)
+        forecast = [make_hour(ts=ts)]
+
+        with patch(
+            "core.windows.detector.calcular_score",
+            side_effect=ValueError("config de spot rota (simulado)"),
+        ):
+            with self.assertRaises(RuntimeError):
+                detectar_ventanas(forecast, spot, umbral=0.50)
+
+    def test_fallo_parcial_no_lanza_solo_descarta_esas_horas(self):
+        """Un fallo aislado (no todas las horas) debe seguir descartándose
+        en silencio, como antes — solo el fallo sistémico (100%) propaga."""
+        spot = make_spot()
+        ahora = datetime.now(timezone.utc)
+        ts_falla = (ahora + timedelta(days=1)).replace(hour=15, minute=0, second=0, microsecond=0)
+        ts_ok = ts_falla + timedelta(hours=1)
+        forecast = [make_hour(ts=ts_falla), make_hour(ts=ts_ok)]
+
+        from core.scoring.engine import calcular_score as real_calcular_score
+
+        def falla_una_hora(hour, spot):
+            if hour.timestamp == ts_falla:
+                raise ValueError("simulado")
+            return real_calcular_score(hour, spot)
+
+        with patch("core.windows.detector.calcular_score", side_effect=falla_una_hora):
+            # No debe lanzar, y la hora que sí calcula score debe seguir
+            # disponible (con umbral=0.0 cualquier score válido forma ventana).
+            ventanas = detectar_ventanas(forecast, spot, umbral=0.0)
+            self.assertIsInstance(ventanas, list)
+            self.assertTrue(
+                any(v.inicio == ts_ok for v in ventanas),
+                f"La hora que sí calculó score ({ts_ok}) debería formar una ventana: {ventanas}",
+            )
 
 
 if __name__ == "__main__":

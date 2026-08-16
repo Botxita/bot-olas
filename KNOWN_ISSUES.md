@@ -1,8 +1,8 @@
 # KNOWN_ISSUES.md — bot-olas
 
-Documento vivo de auditoría de fondo sobre `core/` (scoring, analysis, windows). Generado a partir de una revisión conjunta Claude Code + Codex (auditor independiente, ver `AGENTS.md`), enfocada específicamente en **errores de lógica silenciosos** (el código corre y no crashea, pero calcula algo incorrecto o inconsistente) y **edge cases no cubiertos por el test suite** (169 tests).
+Documento vivo de auditoría de fondo sobre `core/` (scoring, analysis, windows) y, desde el hallazgo #32, sobre **calidad de datos geográficos** de `config/spots/*.json`. Generado a partir de una revisión conjunta Claude Code + Codex (auditor independiente, ver `AGENTS.md`).
 
-**Estado (actualizado tras 3 rondas de fixes):** de los 31 hallazgos documentados, **13 fueron corregidos** en 3 grupos priorizados por Ivan — cada uno marcado `✅ RESUELTO` con su commit. Los **18 restantes siguen abiertos** (sin marcar), quedaron fuera del alcance de esta ronda; no asumir que están corregidos solo porque están en este archivo.
+**Estado (actualizado tras 3 rondas de fixes de código + 1 ronda de auditoría de datos):** de los **55 hallazgos documentados** (31 de código + 24 de datos geográficos), **13 fueron corregidos** en 3 grupos de código priorizados por Ivan — cada uno marcado `✅ RESUELTO` con su commit. Los hallazgos #32-#55 (datos geográficos) son **auditoría pura, todavía sin decidir qué se corrige** — ver advertencia de confiabilidad en esa sección antes de actuar. Los demás hallazgos de código sin marcar (#2, #6-#8, #14-#21, #25-#29, #31) también siguen abiertos.
 
 - **Grupo 1** (`fix-grupo1-scoring-critico`): #5, #12, #22.
 - **Grupo 2** (`fix-grupo2-analisis-y-detector`): #1, #3, #4, #11, #23, #24.
@@ -10,9 +10,9 @@ Documento vivo de auditoría de fondo sobre `core/` (scoring, analysis, windows)
 
 Cada fix pasó por revisión obligatoria de Codex antes de commitear (ver `AGENTS.md`) y sumó tests de regresión — el test suite completo sigue en 217 passed / 15 failed (los 15 son fixtures de fecha fija preexistentes, no relacionados a este documento).
 
-Formato por hallazgo: módulo, severidad, líneas, descripción, escenario concreto, por qué el test suite no lo agarra.
+Formato por hallazgo (#1-#31, código): módulo, severidad, líneas, descripción, escenario concreto, por qué el test suite no lo agarra. Formato por hallazgo (#32-#55, datos geográficos): spot afectado, qué está mal, estimación de corrección — ver la sección propia para su escala de severidad, distinta a la de código.
 
-Severidad: **alta** = puede cambiar una recomendación real hoy con la config de spots actual (59 spots). **media** = afecta casos reales pero de forma más acotada, o es inconsistencia de diseño sin impacto dramático todavía. **baja** = riesgo latente de configuración futura, no disparable con los JSON actuales.
+Severidad para hallazgos #1-#31 (código): **alta** = puede cambiar una recomendación real hoy con la config de spots actual (59 spots). **media** = afecta casos reales pero de forma más acotada, o es inconsistencia de diseño sin impacto dramático todavía. **baja** = riesgo latente de configuración futura, no disparable con los JSON actuales.
 
 ---
 
@@ -263,6 +263,143 @@ Encontrado por Codex durante la revisión del fix #13 (Grupo 3), no parte de la 
 - El comando `/ajuste` (`bot/handlers/main.py:handle_ajuste`) sí hace ambas cosas: `actualizar_ajuste()` (aplica el valor en memoria sobre el `SpotConfig` cacheado) y `session_store.set_spot_adjustment()` (lo persiste en SQLite) — pero nada en el arranque del bot vuelve a leer esa tabla para reaplicar los ajustes sobre el registry recién cargado.
 - Efecto: un ajuste de `/ajuste` funciona mientras el proceso sigue vivo, pero se pierde en cada restart (Render free tier reinicia con frecuencia — cold starts, deploys, sleep del tier gratuito) aunque el mensaje de confirmación ("✅ Ajuste aplicado... invalidado") no deja ver que la persistencia es parcial.
 - **Cobertura:** no cubierta. No hay ningún test de arranque/reload que ejercite `get_all_spot_adjustments()`.
+
+---
+
+## config/spots/peru.json, chile.json, brasil.json — calidad de datos geográficos
+
+Auditoría distinta a las anteriores: no es código, es **calidad de datos** de los 34 spots de estos tres archivos, pedida por Ivan antes de arrancar la Fase 2 (agregar spots nuevos), para no duplicar ni construir sobre datos ya rotos. Mismo método (Codex vía `mcp__codex__codex-reply`, tres tandas por país), formato de severidad distinto (ver abajo) porque la naturaleza del problema es otra.
+
+**⚠️ Advertencia de confiabilidad, antes de actuar sobre esto:** Codex no tuvo acceso a herramienta cartográfica/geocoding en esta sesión — todo lo que sigue sale de su conocimiento geográfico entrenado, no de una verificación en vivo contra un mapa o servicio de geocoding real. Es una buena primera pasada para priorizar qué revisar, **no es una fuente de verdad**. Antes de corregir cualquier coordenada, confirmar contra Google Maps/Google Earth o conocimiento directo del spot (Ivan u otra fuente confiable) — no aplicar las coordenadas "estimadas" de Codex directamente al JSON sin esa verificación.
+
+Severidad (distinta a la de `core/`, adaptada a datos geográficos):
+- **alta** = `orientacion_costa_deg` con signos de estar copiado/genérico (afecta directamente `_score_dir_swell`/`_tipo_viento` del motor de scoring — esto SÍ es funcional, no solo cosmético) o spot asignado a la región administrativa incorrecta.
+- **media** = lat/lon con desplazamiento notable (cientos de metros a pocos km) respecto al spot nombrado. Impacto funcional probablemente bajo (Open-Meteo consulta un modelo meteorológico de grilla gruesa, no una boya hiperlocal — un desplazamiento de pocos km rara vez cambia el dato de forecast obtenido), pero sí afecta la precisión de sunrise/sunset y la integridad de la fuente de verdad.
+- **baja** = inconsistencia cosmética (nombre mal escrito/no oficial) sin impacto funcional en el scoring, solo en UX/búsqueda.
+
+**Cobertura:** ninguno de estos 24 hallazgos tiene test — no existe ningún test que verifique coordenadas contra un valor de referencia real, ni geocoding, ni validación de que `orientacion_costa_deg` no se repita sin justificación entre spots.
+
+### peru.json (12 spots auditados)
+
+### 32. `cerro_azul` en región `ica`, pero administrativamente es Lima/Cañete — **alta**
+
+- Cerro Azul es un distrito de la provincia de Cañete, región **Lima**, no Ica.
+- lat/lon (`-13.0240, -76.4760`) son plausibles para el spot en sí — el problema es solo la región del árbol de navegación del bot.
+- Corrección sugerida por Codex: mover a la región `lima`, o crear una región más precisa (`canete`) dentro de Lima si la organización del bot lo justifica. Ciudad podría ser más específica: "Cerro Azul, Cañete" en vez de solo "Cañete".
+- Caso ya detectado por Ivan antes de pedir esta auditoría.
+
+### 33. `punta_rocas` — coordenadas corresponden al cluster de Punta Hermosa, no a Punta Rocas — **media**
+
+- `-12.3010, -76.8060` cae en el entorno de Punta Hermosa/norte de Punta Hermosa, no en Punta Rocas (Punta Negra), que está más al sur — estimación de Codex: `~-12.36, -76.79/-76.80`.
+- La ciudad (`Punta Negra`) y la región (`lima`) sí son correctas — solo el punto exacto está mal.
+- `orientacion_costa_deg=270` debería recalcularse después de corregir el punto (posiblemente más WSW/SW).
+
+### 34. `el_silencio` — coordenadas corresponden a otro punto del cluster Punta Hermosa — **media**
+
+- `-12.3500, -76.8310` queda al norte/oeste de donde está realmente Playa El Silencio — estimación de Codex: `~-12.37, -76.80`.
+- Región y referencia a Punta Hermosa correctas.
+- `orientacion_costa_deg=270` no debería conservarse sin recalcular tras corregir el punto.
+
+### 35. `miraflores_waikiki` — longitud parece tierra adentro, no sobre la Costa Verde — **media**
+
+- `lon=-77.0306` ubicaría el punto tierra adentro en Miraflores, no sobre la playa. Estimación de Codex: `~-12.13, -77.038/-77.041`.
+- `orientacion_costa_deg=270` es poco plausible para ese tramo inclinado de la Costa Verde — Codex estima la normal real más cerca de WSW/SW, rango `230–250°`. Si esto se confirma, es severidad **alta** (afecta scoring), no solo la coordenada.
+
+### 36. `pico_alto` — coordenadas demasiado cerca de la costa para un reef break offshore — **media**
+
+- Pico Alto es una rompiente mar adentro; `-12.3380, -76.8250` parece estar dentro del conjunto urbano/playas de Punta Hermosa, no sobre el pico real. Estimación de Codex: `~-12.33/-12.34, -76.835/-76.84`.
+- `orientacion_costa_deg=270` es dudoso para un reef offshore — su exposición real depende de la geometría del arrecife, no de una costa genérica.
+
+### 37-39. `chicama`, `huanchaco`, `mancora` — `orientacion_costa_deg` sospechoso de ser valor genérico, no calculado por spot — **alta (si se confirma)**
+
+- Los tres comparten un patrón: valores en el rango 280° que no calzan claramente con la exposición real de cada costa según Codex:
+  - `chicama` (280°): costa de Puerto Chicama/Malabrigo con exposición predominantemente SW — Codex sugiere rango `220–250°`.
+  - `huanchaco` (280°): normal marina local más W/SW — Codex sugiere rango `240–260°`.
+  - `mancora` (280°): costa con componente NW clara — Codex sugiere rango `295–315°`.
+- Como `orientacion_costa_deg` alimenta directamente `_score_dir_swell()`/`_tipo_viento()` del motor, un valor mal calibrado cambia recomendaciones reales — por eso alta severidad si se confirma, no solo estética.
+- **No se corrigieron acá** — son estimaciones de Codex sin verificación cartográfica, quedan para revisión conjunta.
+
+### 40. Grupo Punta Hermosa (`pico_alto`, `caballeros`, `senoritas`, `la_isla`, `el_silencio`) — orientación repetida ~260-270° sin diferenciar geometría real de cada playa/reef — **media**
+
+- 5 spots muy cercanos entre sí comparten valores de `orientacion_costa_deg` casi idénticos pese a ser bahías, puntas y reefs con geometría distinta según Codex.
+- No implica que todos estén mal — implica que conviene recalcular cada uno individualmente en vez de asumir que comparten orientación por estar geográficamente cerca.
+
+### chile.json (7 spots auditados)
+
+### 41. `las_machas` — coordenadas ubicadas al sur de donde está la playa real — **media**
+
+- `-18.4870, -70.3410` cae junto al conjunto El Laucho/La Lisera/Isla Alacrán, no en Las Machas (que está al norte de Arica, continuando desde Chinchorro). Estimación de Codex: `~-18.42/-18.44, -70.32/-70.33`.
+- Región (Arica y Parinacota) correcta.
+
+### 42. `renaca` — longitud parece varios cientos de metros tierra adentro — **media**
+
+- `lon=-71.5385` — Codex estima la línea de playa real más cerca de `-71.545/-71.547`.
+- Región y nombre correctos.
+
+### 43. `punta_de_lobos` — longitud parece mar adentro — **media**
+
+- `lon=-72.0833` ubicaría el punto varios km mar adentro; Codex estima la rompiente/promontorio real en `~-34.43, -72.04/-72.05`.
+- Latitud, región y ciudad correctas — Codex no marca `orientacion_costa_deg=260` como sospechoso acá.
+
+### 44. `la_boca_matanzas` — coordenadas/nombre corresponden a Matanzas en general, no específicamente a "La Boca" — **baja/media**
+
+- `-33.9610, -71.8710` corresponde mejor a Matanzas propiamente que al sector "La Boca" (junto a la desembocadura), que está más al norte — estimación de Codex: `~-33.95, -71.86/-71.87`.
+- Alternativa planteada por Codex: si se prefiere conservar la coordenada actual, el nombre debería simplificarse a "Matanzas" en vez de "La Boca (Matanzas)".
+
+### 45. `pichilemu_infiernillo` — sospechoso, longitud posiblemente corrida al este; nombre ambiguo — **baja (sin confirmar)**
+
+- `-34.3870, -72.0090` podría estar algo al este de la rompiente real de Infiernillo — Codex estima `~-72.013/-72.016`, pero lo marca como "requiere mapa", no alta confianza.
+- Nombre compuesto "Pichilemu / Infiernillo" es ambiguo — si la coordenada representa la rompiente de Infiernillo específicamente, convendría llamarlo solo "Infiernillo".
+
+### brasil.json (15 spots auditados)
+
+### 46. `barra_ibiraquera` — coordenadas demasiado al norte del spot real — **media**
+
+- `-28.1000, -48.6400` cae en el entorno Ouvidor/Rosa norte, no en la barra de la Lagoa de Ibiraquera (que está al sur de Praia do Rosa). Estimación de Codex: `~-28.15/-28.16, -48.64/-48.66`.
+
+### 47. `silveira` — latitud no respeta el orden geográfico real del cluster Garopaba/Imbituba — **media**
+
+- `-28.0950, -48.6350` cae en el entorno Ouvidor/Rosa norte, no en Praia da Silveira (inmediatamente al sur de Garopaba Central, al norte de Ferrugem). Estimación de Codex: `~-28.04/-28.05, -48.61/-48.63`.
+- Codex lo marca como "el error más claro de posible copia o intercambio" dentro del cluster — la secuencia norte-sur real es Garopaba → Silveira → Ferrugem → Ouvidor → Rosa → Ibiraquera, y la coordenada actual de `silveira` no respeta esa secuencia.
+
+### 48. `floripa_joaquina` — coordenadas parecen caer tierra adentro (dunas/interior de la isla) — **media**
+
+- `-27.6428, -48.4736` no corresponde a la línea de rompiente de Joaquina, que está más al norte y al este. Estimación de Codex: `~-27.62/-27.64, -48.44/-48.46`.
+
+### 49. `floripa_praia_mole` — longitud parece ~1.5-2km tierra adentro — **media**
+
+- `lon=-48.4530` — Codex estima la playa real más cerca de `-48.43/-48.44`.
+- Latitud correcta.
+
+### 50. `itamambuca` — coordenadas claramente incorrectas (mar adentro y al norte de Ubatuba) — **media**
+
+- `-23.3340, -44.8820` queda muy al este de la costa de Ubatuba (probablemente mar adentro) y demasiado al norte — el más marcado de los desplazamientos encontrados en Brasil. Estimación de Codex: `~-23.39/-23.41, -45.00/-45.02`.
+- Región y ciudad correctas.
+
+### 51. `maresia` — nombre no coincide con el nombre oficial del destino, además de coordenada corrida — **baja (nombre) / media (coordenada)**
+
+- El nombre reconocido del destino es **"Maresias"** (con "s" final), no "Maresia" — afecta tanto `key` como `nombre` en el JSON.
+- Latitud `-23.776` parece algo al norte de la playa principal — Codex estima `~-23.79, -45.56`. Longitud plausible.
+
+### 52. `praia_madeiro` — longitud parece mar adentro — **media**
+
+- `lon=-35.0430` — Codex estima la playa real más cerca de `-35.055/-35.065`.
+- Región, ciudad y nombre correctos. `orientacion_costa_deg=15` debería recalcularse tras corregir el punto (Codex nota que la playa curva y su exposición no necesariamente coincide con la de Pipa central).
+
+### 53. `praia_do_rosa` — sospechoso, longitud posiblemente corrida al oeste — **baja (sin confirmar)**
+
+- `lon=-48.6600` podría caer algo al oeste de la playa real (área urbana/lagunar) — Codex estima `~-48.64/-48.65`, pero lo marca "requiere mapa".
+- Codex confirma explícitamente que la secuencia norte-sur respecto a Ferrugem es correcta (no están intercambiadas entre sí).
+
+### 54. `floripa_campeche` — coordenadas podrían representar el barrio/acceso, no la línea de rompiente — **baja (sin confirmar)**
+
+- `-27.6875, -48.4900` está en el sector correcto según Codex, pero Campeche es una playa extensa — podría convenir elegir un pico concreto más al este (`~-48.47/-48.48`) en vez del punto de acceso general.
+
+### 55. `garopaba_central` — `orientacion_costa_deg=110` dudoso para la geometría real de la bahía — **media (sin confirmar)**
+
+- Coordenadas plausibles, pero Codex señala que la bahía de Garopaba Central es más protegida y curvada que Ferrugem/Rosa/Silveira, por lo que probablemente no comparte la orientación ESE genérica (`110°`) de esos spots — estima que el sector central podría mirar más hacia E/NE (`60–100°`).
+
+**Spots auditados sin hallazgos** (Codex no encontró problemas suficientemente sólidos): `caballeros`, `senoritas`, `la_isla`, `lobitos` (Perú); `el_gringo`, `ritoque` (Chile); `ferrugem`, `imbituba_porto`, `floripa_barra`, `pipa`, `baia_formosa` (Brasil). **No se encontraron nombres duplicados ni dos keys representando claramente el mismo spot** en ninguno de los tres archivos.
 
 ---
 

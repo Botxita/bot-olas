@@ -116,7 +116,17 @@ def detectar_mareas(
     # Calcular tendencia actual (últimas 3 horas disponibles)
     tendencia, proximo_cambio = _calcular_tendencia(timestamps, niveles_suavizados)
 
-    nivel_actual = niveles[0] if niveles else None
+    # nivel_actual debe reflejar el primer punto relevante para el caller
+    # (>= 'desde'), no el primer elemento de TODO el forecast — antes,
+    # con 'desde' filtrando el pasado, nivel_actual seguía mostrando un
+    # nivel ya pasado en vez del que corresponde a la ventana pedida (#17).
+    # Si ningún timestamp cae en o después de 'desde', no hay nivel
+    # relevante que reportar.
+    if desde is not None:
+        idx_desde = next((i for i, ts in enumerate(timestamps) if ts >= desde), None)
+        nivel_actual = niveles[idx_desde] if idx_desde is not None else None
+    else:
+        nivel_actual = niveles[0] if niveles else None
 
     tiene_claros = (
         len(eventos) >= 1

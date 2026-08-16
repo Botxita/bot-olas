@@ -388,6 +388,48 @@ def test_desde_filtra_eventos_pasados():
                 f"Evento {evento.timestamp} anterior al corte {corte}"
 
 
+def test_desde_nivel_actual_respeta_el_filtro():
+    """
+    Regresión #17: nivel_actual debe reflejar el primer punto relevante
+    para el caller (>= 'desde'), no el primer elemento de TODO el
+    forecast. Ejemplo exacto del hallazgo: 08:00=0.4m, 09:00=0.6m,
+    10:00=0.8m, desde=10:00 -> nivel_actual debe ser 0.8, no 0.4.
+    """
+    inicio = datetime(2025, 1, 15, 8, 0, tzinfo=timezone.utc)
+    niveles = [0.4, 0.6, 0.8]
+    forecast = []
+    for i, nivel in enumerate(niveles):
+        ts = inicio + timedelta(hours=i)
+        tide = TideData(nivel_m=nivel, fuente="proxy_msl", es_exacto=False)
+        swell = SwellData(altura_m=1.0, periodo_s=10.0, direccion_deg=180.0)
+        wind = WindData(velocidad_kmh=10.0, rafaga_kmh=15.0, direccion_deg=180.0)
+        forecast.append(ForecastHour(timestamp=ts, swell=swell, wind=wind, tide=tide))
+
+    desde = datetime(2025, 1, 15, 10, 0, tzinfo=timezone.utc)
+    result_sin_filtro = detectar_mareas(forecast)
+    result_filtrado = detectar_mareas(forecast, desde=desde)
+
+    assert result_sin_filtro.nivel_actual == 0.4
+    assert result_filtrado.nivel_actual == 0.8
+
+
+def test_desde_nivel_actual_none_si_no_hay_horas_en_o_despues():
+    """Si 'desde' cae después de todo el forecast, no hay nivel relevante que reportar."""
+    inicio = datetime(2025, 1, 15, 8, 0, tzinfo=timezone.utc)
+    niveles = [0.4, 0.6, 0.8]
+    forecast = []
+    for i, nivel in enumerate(niveles):
+        ts = inicio + timedelta(hours=i)
+        tide = TideData(nivel_m=nivel, fuente="proxy_msl", es_exacto=False)
+        swell = SwellData(altura_m=1.0, periodo_s=10.0, direccion_deg=180.0)
+        wind = WindData(velocidad_kmh=10.0, rafaga_kmh=15.0, direccion_deg=180.0)
+        forecast.append(ForecastHour(timestamp=ts, swell=swell, wind=wind, tide=tide))
+
+    desde = datetime(2025, 1, 15, 20, 0, tzinfo=timezone.utc)  # después de la última hora
+    result = detectar_mareas(forecast, desde=desde)
+    assert result.nivel_actual is None
+
+
 # ---------------------------------------------------------------------------
 # Tests de detectar_mareas_del_dia
 # ---------------------------------------------------------------------------

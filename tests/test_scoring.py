@@ -9,7 +9,7 @@ import json
 import os
 import sys
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 # Agregar el root al path para importar módulos
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -330,6 +330,63 @@ class TestDetectorVentanas(unittest.TestCase):
         spot = make_spot()
         ventanas = detectar_ventanas([], spot)
         self.assertEqual(ventanas, [])
+
+    def test_horizonte_48h_excluye_ventanas_lejanas(self):
+        """
+        Regresión #22: aunque el forecast recibido tenga más de 48h de datos
+        (Open-Meteo puede devolver hasta 7 días y los handlers no recortan),
+        el detector no debe generar ventanas más allá del horizonte declarado.
+        """
+        spot = make_spot()
+        ahora = datetime.now(timezone.utc)
+        # Hora "cercana": mañana a las 15:00 UTC (~mediodía en AR), bien dentro de 48h.
+        ts_cercana = (ahora + timedelta(days=1)).replace(hour=15, minute=0, second=0, microsecond=0)
+        # Hora "lejana": una semana después a la misma hora UTC — fuera del horizonte de 48h.
+        ts_lejana = ts_cercana + timedelta(days=6)
+
+        condiciones_ideales = dict(
+            altura=1.4, periodo=14, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0
+        )
+        forecast = [
+            make_hour(ts=ts_cercana, **condiciones_ideales),
+            make_hour(ts=ts_lejana, **condiciones_ideales),
+        ]
+
+        ventanas = detectar_ventanas(forecast, spot, umbral=0.60)
+
+        limite_48h = ahora + timedelta(hours=48)
+        self.assertTrue(
+            all(v.fin <= limite_48h for v in ventanas),
+            "No debería haber ventanas más allá del horizonte de 48h",
+        )
+        # La hora cercana, con condiciones ideales, sí debe generar ventana.
+        self.assertTrue(any(v.inicio == ts_cercana for v in ventanas))
+
+    def test_horizonte_configurable(self):
+        """
+        horizonte_horas debe ser ajustable por el caller, no fijo en 48.
+
+        Usa un margen grande (~7 días vs. 10 días de horizonte) a propósito:
+        con un margen chico (ej. 72h) el offset real entre "ahora" y un
+        timestamp construido con día+hora fija puede variar hasta ~24h según
+        la hora UTC en que corra el test, generando un test flaky en el borde.
+        Con ~168h de por medio esa variación es irrelevante.
+        """
+        spot = make_spot()
+        ahora = datetime.now(timezone.utc)
+        # ~7 días en el futuro, a las 15:00 UTC (mediodía AR, daylight seguro).
+        ts_lejos = (ahora + timedelta(days=7)).replace(hour=15, minute=0, second=0, microsecond=0)
+
+        condiciones_ideales = dict(
+            altura=1.4, periodo=14, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0
+        )
+        forecast = [make_hour(ts=ts_lejos, **condiciones_ideales)]
+
+        # Con horizonte default (48h) esta hora queda afuera.
+        self.assertEqual(detectar_ventanas(forecast, spot, umbral=0.60), [])
+        # Con horizonte extendido a 10 días, debe aparecer.
+        ventanas_extendidas = detectar_ventanas(forecast, spot, umbral=0.60, horizonte_horas=24 * 10)
+        self.assertTrue(any(v.inicio == ts_lejos for v in ventanas_extendidas))
 
     def test_calcular_score_actual(self):
         spot = make_spot()

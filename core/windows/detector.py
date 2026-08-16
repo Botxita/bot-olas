@@ -37,17 +37,22 @@ def detectar_ventanas(
     spot: SpotConfig,
     umbral: float = None,
     top_n: int = None,
+    horizonte_horas: float = 48,
 ) -> List[VentanaOptima]:
     """
     Detecta ventanas óptimas de surf en un forecast de 48h.
 
     Args:
-        forecast: lista de ForecastHour (típicamente 48 elementos)
+        forecast: lista de ForecastHour. El proveedor real (Open-Meteo) puede
+                  devolver hasta 7 días — esta función recorta al horizonte
+                  declarado antes de procesar, no asume que el caller ya lo hizo.
         spot: configuración del spot
         umbral: score mínimo (0-1) para considerar una hora como buena.
                 None = leer de scoring_weights.json
         top_n: máximo de ventanas a retornar.
                 None = leer de scoring_weights.json
+        horizonte_horas: cuántas horas hacia adelante considerar desde ahora.
+                Default 48, acorde al contrato de "Próximas olas — 48h".
 
     Returns:
         Lista de VentanaOptima ordenada por score_promedio descendente.
@@ -56,6 +61,18 @@ def detectar_ventanas(
     umbral = umbral if umbral is not None else config.get("umbral_ventana_optima", 0.60)
     top_n = top_n if top_n is not None else config.get("top_ventanas", 3)
 
+    if not forecast:
+        return []
+
+    # Recortar al horizonte declarado (48h por defecto). No filtramos el piso
+    # (horas ya pasadas) acá: una ventana en curso puede haber empezado antes
+    # de "ahora" y necesita esas horas para calcularse correctamente.
+    # Cada ForecastHour representa un bloque de 1h (ver _construir_ventana:
+    # fin = última hora + 1h) — exigimos que el FIN del bloque quede dentro
+    # del horizonte, no solo su inicio, para que ninguna ventana resultante
+    # pueda terminar después del límite declarado.
+    limite = datetime.now(timezone.utc) + timedelta(hours=horizonte_horas)
+    forecast = [h for h in forecast if h.timestamp + timedelta(hours=1) <= limite]
     if not forecast:
         return []
 

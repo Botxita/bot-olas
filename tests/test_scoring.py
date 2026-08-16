@@ -568,6 +568,41 @@ class TestMarea(unittest.TestCase):
         self.assertLess(s_abajo, 1.0)
         self.assertLess(s_arriba, 1.0)
 
+    def test_penalizacion_fuera_de_rango_es_relativa_a_amplitud(self):
+        """
+        Regresión #7: el mismo desvío ABSOLUTO (0.2m) debe penalizar más a
+        un spot con rango angosto que a uno con rango ancho — antes ambos
+        perdían exactamente lo mismo porque la penalización era en metros
+        absolutos, sin relación al ancho del rango de cada spot.
+        """
+        spot_angosto = make_spot(marea_min=0.2, marea_max=0.8, marea_tipo_efecto="mid_better")  # amplitud 0.3
+        spot_ancho = make_spot(marea_min=0.5, marea_max=2.0, marea_tipo_efecto="mid_better")     # amplitud 0.75
+
+        s_angosto = _score_marea(TideData(nivel_m=0.0), spot_angosto)  # 0.2m por debajo de marea_min
+        s_ancho = _score_marea(TideData(nivel_m=0.3), spot_ancho)      # también 0.2m por debajo de marea_min
+
+        self.assertLess(s_angosto, s_ancho, "El mismo desvío absoluto debería penalizar más al rango angosto")
+
+    def test_desvio_igual_a_amplitud_llega_justo_al_piso(self):
+        """Congela el significado del coeficiente 0.70: un desvío de exactamente
+        un semi-ancho de rango (desvio == amplitud) debe dar score == 0.10."""
+        spot = make_spot(marea_min=0.4, marea_max=1.6, marea_tipo_efecto="mid_better")  # amplitud 0.6
+        s = _score_marea(TideData(nivel_m=0.4 - 0.6), spot)  # desvio == amplitud == 0.6
+        self.assertAlmostEqual(s, 0.10, delta=0.001)
+
+    def test_penalizacion_fuera_de_rango_misma_para_desvio_relativo_igual(self):
+        """Contraparte: si el desvío es proporcionalmente igual (mismo
+        desvio/amplitud), el score debe ser el mismo sin importar el ancho
+        real del rango del spot."""
+        spot_angosto = make_spot(marea_min=0.2, marea_max=0.8, marea_tipo_efecto="mid_better")  # amplitud 0.3
+        spot_ancho = make_spot(marea_min=0.5, marea_max=2.0, marea_tipo_efecto="mid_better")     # amplitud 0.75
+
+        # Mismo desvío relativo: 1/3 de la amplitud, por debajo de marea_min.
+        s_angosto = _score_marea(TideData(nivel_m=0.2 - 0.3 / 3), spot_angosto)
+        s_ancho = _score_marea(TideData(nivel_m=0.5 - 0.75 / 3), spot_ancho)
+
+        self.assertAlmostEqual(s_angosto, s_ancho, delta=0.001)
+
 
 # ------------------------------------------------------------------
 # Tests del score total

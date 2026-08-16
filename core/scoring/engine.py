@@ -338,8 +338,14 @@ def _score_marea(tide: TideData, spot: SpotConfig) -> float:
         # — nunca en 1.0. Antes, un desvío de una milésima de metro saltaba
         # de 0.80 a ~1.00 de golpe (regresión #2) porque esta rama ignoraba
         # el valor del borde y siempre empezaba a decaer desde el máximo.
-        # Penalización capped: no llega a 0 (la marea sigue siendo surfeeable)
-        return max(0.10, 0.80 - desvio * 0.50)
+        # La penalización es relativa a `amplitud` (el semi-ancho del rango
+        # óptimo del spot), no metros absolutos (regresión #7) — un desvío
+        # de 0.2m es grave para un spot con rango angosto (ej. 0.2-0.8m) y
+        # casi irrelevante para uno con rango ancho (ej. 0.5-2.0m); antes
+        # ambos perdían exactamente lo mismo. Un desvío de un semi-ancho
+        # completo (desvio == amplitud) llega justo al piso; capped: no
+        # llega a 0 (la marea sigue siendo surfeeable).
+        return max(0.10, 0.80 - 0.70 * (desvio / amplitud))
 
 
 # ---------------------------------------------------------------------------

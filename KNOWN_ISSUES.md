@@ -6,7 +6,7 @@ Documento vivo de auditoría de fondo sobre `core/` (scoring, analysis, windows)
 - **10 verificados por Ivan en Google Maps** (la fuente más confiable): #33, #34, #41, #43, #44, #46, #47, #48, #49, #53.
 - **7 del "grupo confiable"** aplicados a partir de estimaciones de Codex (punto medio de rango sugerido, o coordenada estimada), **sin verificación cartográfica** de Ivan: #32, #37, #38, #39, #40, #50, #51 — tratar con más cautela que los 10 anteriores.
 
-#45 y #36 (coordenadas) fueron verificados y confirmados que **no** necesitan corrección — #36 tuvo una primera búsqueda inconclusa (hotel homónimo) y una segunda que sí confirmó el punto real, a ~700m del JSON actual, dentro de margen razonable para un break offshore sin punto único exacto; la orientación de `pico_alto` sí se corrigió por separado como parte de #40. #54 sigue como el único caso con evidencia insuficiente (`🔍 VERIFICADO — EVIDENCIA INSUFICIENTE`). El resto (#35, #42, #52, #55) sigue como auditoría sin aplicar, sin ninguna acción todavía — ver advertencia de confiabilidad en esa sección antes de actuar. Los demás hallazgos de código sin marcar (#2, #6-#8, #14-#21, #25-#29, #31) también siguen abiertos.
+**Los 24 hallazgos geográficos quedan 100% cerrados** (con acción tomada o verificación explícita en cada uno): 17 corregidos (ver arriba) + 6 verificados sin cambios necesarios en sus coordenadas (#36, #35, #42, #45, #52, #55 — de estos, #35/#52/#55 tienen una sospecha de `orientacion_costa_deg` que la verificación de coordenadas NO abordó, sigue marcada `⚠️` en cada uno por separado) + 1 con evidencia insuficiente para decidir (#54, `🔍 VERIFICADO — EVIDENCIA INSUFICIENTE`). Los demás hallazgos de código sin marcar (#2, #6-#8, #14-#21, #25-#29, #31) siguen abiertos, sin tocar todavía.
 
 - **Grupo 1** (`fix-grupo1-scoring-critico`): #5, #12, #22.
 - **Grupo 2** (`fix-grupo2-analisis-y-detector`): #1, #3, #4, #11, #23, #24.
@@ -312,6 +312,9 @@ Severidad (distinta a la de `core/`, adaptada a datos geográficos):
 
 ### 35. `miraflores_waikiki` — longitud parece tierra adentro, no sobre la Costa Verde — **media**
 
+**✅ COORDENADAS: VERIFICADO — SIN CAMBIOS NECESARIOS.** Ivan verificó contra Google Maps: coherente con la costa real de Miraflores. lat/lon quedan sin tocar.
+**⚠️ ORIENTACIÓN: sigue sin confirmar.** La sospecha de Codex sobre `orientacion_costa_deg=270` (estima rango real `230–250°`, severidad alta si se confirma porque afecta `_tipo_viento()`) no fue parte de esta verificación — Ivan confirmó la ubicación, no la orientación. Sigue abierto si se quiere revisar por separado.
+
 - `lon=-77.0306` ubicaría el punto tierra adentro en Miraflores, no sobre la playa. Estimación de Codex: `~-12.13, -77.038/-77.041`.
 - `orientacion_costa_deg=270` es poco plausible para ese tramo inclinado de la Costa Verde — Codex estima la normal real más cerca de WSW/SW, rango `230–250°`. Si esto se confirma, es severidad **alta** (afecta scoring), no solo la coordenada.
 
@@ -350,6 +353,8 @@ Severidad (distinta a la de `core/`, adaptada a datos geográficos):
 - Región (Arica y Parinacota) correcta.
 
 ### 42. `renaca` — longitud parece varios cientos de metros tierra adentro — **media**
+
+**✅ VERIFICADO — SIN CAMBIOS NECESARIOS.** Ivan verificó contra Google Maps: coherente con la distancia real a Viña del Mar. lat/lon quedan sin tocar.
 
 - `lon=-71.5385` — Codex estima la línea de playa real más cerca de `-71.545/-71.547`.
 - Región y nombre correctos.
@@ -419,6 +424,9 @@ Severidad (distinta a la de `core/`, adaptada a datos geográficos):
 
 ### 52. `praia_madeiro` — longitud parece mar adentro — **media**
 
+**✅ COORDENADAS: VERIFICADO — SIN CAMBIOS NECESARIOS.** Ivan verificó contra fuentes de Pipa/Tibau do Sul: real `~-6.23, -35.05` vs JSON `-6.2140, -35.0430` — diferencia de ~2km, dentro de margen razonable. lat/lon quedan sin tocar.
+**⚠️ ORIENTACIÓN: sigue sin confirmar.** La sospecha de Codex sobre `orientacion_costa_deg=15` (la playa curva, la exposición podría no coincidir con la de Pipa central) no fue parte de esta verificación.
+
 - `lon=-35.0430` — Codex estima la playa real más cerca de `-35.055/-35.065`.
 - Región, ciudad y nombre correctos. `orientacion_costa_deg=15` debería recalcularse tras corregir el punto (Codex nota que la playa curva y su exposición no necesariamente coincide con la de Pipa central).
 
@@ -436,6 +444,9 @@ Severidad (distinta a la de `core/`, adaptada a datos geográficos):
 - `-27.6875, -48.4900` está en el sector correcto según Codex, pero Campeche es una playa extensa — podría convenir elegir un pico concreto más al este (`~-48.47/-48.48`) en vez del punto de acceso general.
 
 ### 55. `garopaba_central` — `orientacion_costa_deg=110` dudoso para la geometría real de la bahía — **media (sin confirmar)**
+
+**✅ COORDENADAS: VERIFICADO — SIN CAMBIOS NECESARIOS.** Ivan verificó contra Wikipedia oficial: real `-28.0233, -48.6222` vs JSON `-28.0270, -48.6180` — diferencia de ~0.5km, muy preciso. lat/lon quedan sin tocar.
+**⚠️ ORIENTACIÓN: sigue sin confirmar.** Este hallazgo era específicamente sobre `orientacion_costa_deg=110` (bahía más protegida/curvada que Ferrugem/Rosa/Silveira, Codex estima que podría mirar más hacia E/NE, `60–100°`) — la verificación de coordenadas no lo aborda, sigue abierto.
 
 - Coordenadas plausibles, pero Codex señala que la bahía de Garopaba Central es más protegida y curvada que Ferrugem/Rosa/Silveira, por lo que probablemente no comparte la orientación ESE genérica (`110°`) de esos spots — estima que el sector central podría mirar más hacia E/NE (`60–100°`).
 

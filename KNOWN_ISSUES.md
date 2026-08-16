@@ -6,7 +6,7 @@ Documento vivo de auditoría de fondo sobre `core/` (scoring, analysis, windows)
 - **10 verificados por Ivan en Google Maps** (la fuente más confiable): #33, #34, #41, #43, #44, #46, #47, #48, #49, #53.
 - **7 del "grupo confiable"** aplicados a partir de estimaciones de Codex (punto medio de rango sugerido, o coordenada estimada), **sin verificación cartográfica** de Ivan: #32, #37, #38, #39, #40, #50, #51 — tratar con más cautela que los 10 anteriores.
 
-#45 fue verificado y confirmado que **no** necesita corrección. #36 y #54 fueron investigados pero la evidencia encontrada no fue concluyente (marcados `🔍 VERIFICADO — EVIDENCIA INSUFICIENTE`, distinto de resuelto o sin tocar; para #36 la orientación sí se corrigió como parte de #40, solo las coordenadas quedaron sin resolver). El resto (#35, #42, #52, #55) sigue como auditoría sin aplicar, sin ninguna acción todavía — ver advertencia de confiabilidad en esa sección antes de actuar. Los demás hallazgos de código sin marcar (#2, #6-#8, #14-#21, #25-#29, #31) también siguen abiertos.
+#45 y #36 (coordenadas) fueron verificados y confirmados que **no** necesitan corrección — #36 tuvo una primera búsqueda inconclusa (hotel homónimo) y una segunda que sí confirmó el punto real, a ~700m del JSON actual, dentro de margen razonable para un break offshore sin punto único exacto; la orientación de `pico_alto` sí se corrigió por separado como parte de #40. #54 sigue como el único caso con evidencia insuficiente (`🔍 VERIFICADO — EVIDENCIA INSUFICIENTE`). El resto (#35, #42, #52, #55) sigue como auditoría sin aplicar, sin ninguna acción todavía — ver advertencia de confiabilidad en esa sección antes de actuar. Los demás hallazgos de código sin marcar (#2, #6-#8, #14-#21, #25-#29, #31) también siguen abiertos.
 
 - **Grupo 1** (`fix-grupo1-scoring-critico`): #5, #12, #22.
 - **Grupo 2** (`fix-grupo2-analisis-y-detector`): #1, #3, #4, #11, #23, #24.
@@ -317,8 +317,8 @@ Severidad (distinta a la de `core/`, adaptada a datos geográficos):
 
 ### 36. `pico_alto` — coordenadas demasiado cerca de la costa para un reef break offshore — **media**
 
-**🔍 COORDENADAS: VERIFICADO — EVIDENCIA INSUFICIENTE.** Ivan investigó en Google Maps pero la búsqueda encontró un hotel llamado "Pico Alto", no el break real — lat/lon siguen siendo las originales de abajo, sin cambios.
-**✅ ORIENTACIÓN: RESUELTA** — `orientacion_costa_deg` 270°→225°, aplicado junto con el resto del cluster Punta Hermosa (ver #40), en el mismo commit que esta actualización de KNOWN_ISSUES.md.
+**✅ COORDENADAS: VERIFICADO — SIN CAMBIOS NECESARIOS.** Primera búsqueda de Ivan en Maps había encontrado un hotel llamado "Pico Alto" (evidencia insuficiente), pero en una segunda pasada confirmó el punto real del break (offshore, point break): `-12.334201, -76.830983`. Diferencia contra el JSON actual (`-12.3380, -76.8250`) es de solo ~700m — dentro de margen razonable para un break mar adentro sin punto único exacto. lat/lon quedan sin tocar.
+**✅ ORIENTACIÓN: RESUELTA** — `orientacion_costa_deg` 270°→225°, aplicado junto con el resto del cluster Punta Hermosa (ver #40), commit `19a7605`.
 
 - Pico Alto es una rompiente mar adentro; `-12.3380, -76.8250` parece estar dentro del conjunto urbano/playas de Punta Hermosa, no sobre el pico real. Estimación de Codex: `~-12.33/-12.34, -76.835/-76.84`.
 - `orientacion_costa_deg=270` es dudoso para un reef offshore — su exposición real depende de la geometría del arrecife, no de una costa genérica.

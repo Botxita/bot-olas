@@ -22,6 +22,7 @@ from core.scoring.engine import (
     _score_periodo,
     _score_dir_swell,
     _score_viento,
+    _factor_rafaga,
     _score_marea,
     calcular_score,
     _angulo_relativo,
@@ -424,6 +425,59 @@ class TestViento(unittest.TestCase):
         for dir_v in [0, 90, 180, 270]:
             wind = WindData(velocidad_kmh=3, rafaga_kmh=5, direccion_deg=dir_v)
             self.assertEqual(_score_viento(wind, 90), 1.0)
+
+    def test_rafaga_dentro_de_margen_no_penaliza(self):
+        """Regresión #8: exceso <= 10 km/h es variabilidad normal, no penaliza."""
+        self.assertEqual(_factor_rafaga(velocidad_kmh=10, rafaga_kmh=20), 1.0)  # exceso exacto = 10
+
+    def test_rafaga_extrema_penaliza_viento_sostenido_calmo(self):
+        """
+        Regresión #8: WindData.rafaga_kmh se cargaba pero nunca se leía —
+        un sostenido calmo con ráfagas extremas puntuaba igual que uno con
+        ráfagas normales. Ejemplo del hallazgo original: sostenido 3 km/h,
+        ráfaga 100 km/h ya no debe dar el mismo score que ráfaga 5 km/h.
+        """
+        wind_normal = WindData(velocidad_kmh=3, rafaga_kmh=5, direccion_deg=90)
+        wind_rafagoso = WindData(velocidad_kmh=3, rafaga_kmh=100, direccion_deg=90)
+        s_normal = _score_viento(wind_normal, orientacion_costa=90)
+        s_rafagoso = _score_viento(wind_rafagoso, orientacion_costa=90)
+        self.assertEqual(s_normal, 1.0)
+        self.assertLess(s_rafagoso, s_normal)
+
+    def test_piso_05_en_rafaga_extrema(self):
+        """El factor de ráfaga nunca anula el score, tiene piso 0.5."""
+        f = _factor_rafaga(velocidad_kmh=3, rafaga_kmh=200)
+        self.assertAlmostEqual(f, 0.5, delta=0.001)
+
+    def test_rafaga_penaliza_tambien_con_viento_fuerte(self):
+        """El factor de ráfaga se aplica sin importar la rama de velocidad
+        sostenida — no es exclusivo del viento calmo."""
+        wind_normal = WindData(velocidad_kmh=25, rafaga_kmh=30, direccion_deg=275)
+        wind_rafagoso = WindData(velocidad_kmh=25, rafaga_kmh=70, direccion_deg=275)
+        s_normal = _score_viento(wind_normal, orientacion_costa=95)
+        s_rafagoso = _score_viento(wind_rafagoso, orientacion_costa=95)
+        self.assertLess(s_rafagoso, s_normal)
+
+    def test_rafaga_fuerte_no_queda_sin_advertencia_en_offshore_limpio(self):
+        """
+        Regresión #8 (hallazgo de Codex): un offshore sostenido limpio con
+        ráfagas extremas penaliza score_viento, pero _generar_flags() solo
+        miraba wind.velocidad_kmh — el usuario veía únicamente "Offshore
+        limpio" sin ninguna indicación de por qué el score bajó. Vía
+        calcular_score(), el flag de ráfagas debe aparecer junto al de
+        offshore limpio, no reemplazarlo.
+        """
+        spot = make_spot(orientacion=95, tolerancia=45)
+        hour = ForecastHour(
+            timestamp=datetime(2025, 2, 1, 8, 0, tzinfo=timezone.utc),
+            swell=SwellData(altura_m=1.2, periodo_s=12, direccion_deg=95),
+            wind=WindData(velocidad_kmh=3, rafaga_kmh=100, direccion_deg=275),
+            tide=TideData(nivel_m=1.0),
+        )
+        bd = calcular_score(hour, spot)
+        self.assertLess(bd.score_viento, 1.0)
+        self.assertTrue(any("Offshore limpio" in f for f in bd.flags_positivos))
+        self.assertTrue(any("Ráfagas fuertes" in f for f in bd.flags_negativos))
 
 
 class TestMarea(unittest.TestCase):

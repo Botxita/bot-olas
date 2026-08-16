@@ -223,6 +223,25 @@ def _tipo_viento(dir_viento: float, orientacion_costa: float) -> str:
         return "onshore"
 
 
+def _factor_rafaga(velocidad_kmh: float, rafaga_kmh: float) -> float:
+    """
+    Factor multiplicativo que penaliza ráfagas mucho más fuertes que el
+    viento sostenido — antes se ignoraban por completo (`WindData.rafaga_kmh`
+    se cargaba pero nunca se leía): un viento sostenido calmo (3 km/h) con
+    ráfagas de 100 km/h puntuaba exactamente igual que viento sin ráfagas,
+    aunque esa variabilidad haga la sesión impracticable o peligrosa.
+
+    No penaliza si la ráfaga está dentro de una variabilidad normal
+    (exceso <= 10 km/h sobre el sostenido). Decae linealmente a partir de
+    ahí, con piso en 0.5 (nunca anula el resto del score de viento, solo
+    lo atenúa — mismo criterio de "no llegar a 0" que el resto del motor).
+    """
+    exceso = rafaga_kmh - velocidad_kmh
+    if exceso <= 10:
+        return 1.0
+    return max(0.5, 1.0 - 0.5 * (exceso - 10) / 30)
+
+
 def _score_viento(
     wind: WindData,
     orientacion_costa: float,
@@ -241,33 +260,38 @@ def _score_viento(
     de escala es 1.0 y los escalones quedan idénticos a los originales.
     Viento cross no tiene campo de config específico, queda con la curva
     global sin escalar.
+
+    Al final se aplica `_factor_rafaga()` sobre el resultado, sin importar
+    la rama (incluida la de viento calmo) — un sostenido calmo con ráfagas
+    fuertes debe penalizarse igual que uno con viento fuerte y ráfagas
+    fuertes (regresión #8).
     """
     tipo = _tipo_viento(wind.direccion_deg, orientacion_costa)
     vel = wind.velocidad_kmh
 
     if vel < 5:
-        return 1.0   # Calmo: siempre perfecto
-
-    if tipo == "offshore":
+        score = 1.0   # Calmo: siempre perfecto (antes de aplicar ráfagas)
+    elif tipo == "offshore":
         k = viento_max_offshore / 40.0
-        if vel < 15 * k: return 0.98
-        if vel < 25 * k: return 0.90
-        if vel < 35 * k: return 0.78
-        if vel < 50 * k: return 0.60
-        return 0.40  # Offshore muy fuerte: dificultad para remar
-
-    if tipo == "onshore":
+        if vel < 15 * k: score = 0.98
+        elif vel < 25 * k: score = 0.90
+        elif vel < 35 * k: score = 0.78
+        elif vel < 50 * k: score = 0.60
+        else: score = 0.40  # Offshore muy fuerte: dificultad para remar
+    elif tipo == "onshore":
         k = viento_max_onshore / 15.0
-        if vel < 10 * k: return 0.55
-        if vel < 20 * k: return 0.30
-        if vel < 30 * k: return 0.15
-        return 0.05  # Onshore fuerte: olas destruidas
+        if vel < 10 * k: score = 0.55
+        elif vel < 20 * k: score = 0.30
+        elif vel < 30 * k: score = 0.15
+        else: score = 0.05  # Onshore fuerte: olas destruidas
+    else:
+        # cross
+        if vel < 10: score = 0.80
+        elif vel < 20: score = 0.65
+        elif vel < 30: score = 0.48
+        else: score = 0.30
 
-    # cross
-    if vel < 10: return 0.80
-    if vel < 20: return 0.65
-    if vel < 30: return 0.48
-    return 0.30
+    return score * _factor_rafaga(vel, wind.rafaga_kmh)
 
 
 # ---------------------------------------------------------------------------
@@ -393,6 +417,12 @@ def _generar_flags(
             neutros.append(f"Viento lateral suave ({wind.velocidad_kmh:.0f} km/h)")
         else:
             negativos.append(f"Viento lateral ({wind.velocidad_kmh:.0f} km/h)")
+
+    # Ráfagas — independiente del tipo de viento (offshore/onshore/cross):
+    # un sostenido calmo/limpio con ráfagas fuertes no debe quedar sin
+    # advertencia solo porque el flag de arriba es positivo (#8).
+    if _factor_rafaga(wind.velocidad_kmh, wind.rafaga_kmh) < 1.0:
+        negativos.append(f"Ráfagas fuertes ({wind.rafaga_kmh:.0f} km/h)")
 
     # Altura
     if swell.altura_m < spot.swell_altura_min:

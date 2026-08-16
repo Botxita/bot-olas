@@ -186,6 +186,7 @@ def handle_ajuste(update: Update, context: CallbackContext):
     if len(args) != 3:
         update.message.reply_text(
             "Uso: /ajuste <spot_key> <param> <valor>\n"
+            "Parámetros válidos: delta_altura, delta_marea, factor_periodo\n"
             "Ejemplo: /ajuste mdq_varese delta_altura 0.2"
         )
         return

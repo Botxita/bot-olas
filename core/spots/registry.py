@@ -133,6 +133,7 @@ def _build_spot_config(key: str, d: dict, pais: str, region: str) -> SpotConfig:
         viento_max_onshore=viento.get("vel_max_onshore_kmh", 15.0),
         direcciones_ideales=swell.get("direcciones_ideales", []),
         delta_altura=ajustes.get("delta_altura", 0.0),
+        delta_marea=ajustes.get("delta_marea", 0.0),
         factor_periodo=ajustes.get("factor_periodo", 1.0),
         fuente_datos=d.get("fuente_datos", "open-meteo"),
         notas=d.get("notas", ""),
@@ -197,6 +198,8 @@ def actualizar_ajuste(spot_key: str, param: str, valor: float):
         raise KeyError(f"Spot '{spot_key}' no encontrado.")
     if param == "delta_altura":
         spot.delta_altura = valor
+    elif param == "delta_marea":
+        spot.delta_marea = valor
     elif param == "factor_periodo":
         spot.factor_periodo = valor
     else:

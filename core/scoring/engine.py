@@ -449,6 +449,16 @@ def calcular_score(hour: ForecastHour, spot: SpotConfig) -> ScoreBreakdown:
         direccion_deg=hour.swell.direccion_deg,
         altura_viento_m=hour.swell.altura_viento_m,
     )
+    # delta_marea es independiente de delta_altura (regresión #13) — se
+    # aplica acá para que el score de marea y sus flags usen el mismo
+    # nivel calibrado que ya muestra core/analysis/tides.py, no el nivel
+    # crudo de Open-Meteo. Sin esto, la vista de mareas podía decir "marea
+    # en rango óptimo" mientras el motor puntuaba contra un nivel distinto.
+    tide_ajustada = TideData(
+        nivel_m=hour.tide.nivel_m + spot.delta_marea,
+        fuente=hour.tide.fuente,
+        es_exacto=hour.tide.es_exacto,
+    )
 
     # Calcular sub-scores
     energia = _energia_proxy(swell_ajustado)  # H²×T crudo, para debug/display — sin cambios
@@ -476,7 +486,7 @@ def calcular_score(hour: ForecastHour, spot: SpotConfig) -> ScoreBreakdown:
         hour.wind, spot.orientacion_costa_deg,
         spot.viento_max_offshore, spot.viento_max_onshore,
     )
-    s_marea = _score_marea(hour.tide, spot)
+    s_marea = _score_marea(tide_ajustada, spot)
 
     # Score total ponderado
     score_total = (
@@ -489,7 +499,7 @@ def calcular_score(hour: ForecastHour, spot: SpotConfig) -> ScoreBreakdown:
     score_total = min(1.0, max(0.0, score_total))
 
     # Flags
-    pos, neg, neu = _generar_flags(swell_ajustado, hour.wind, hour.tide, spot, energia)
+    pos, neg, neu = _generar_flags(swell_ajustado, hour.wind, tide_ajustada, spot, energia)
 
     return ScoreBreakdown(
         score_energia=round(s_energia, 3),

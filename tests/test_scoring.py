@@ -308,6 +308,28 @@ class TestDireccionSwell(unittest.TestCase):
         spot = get_spot("mdq_playa_grande")
         self.assertEqual(spot.direcciones_ideales, [90, 120, 150])
 
+    def test_registry_carga_delta_marea_default(self):
+        """
+        Regresión #13: delta_marea es un campo nuevo e independiente de
+        delta_altura. Ningún spot real lo especifica en config/spots/*.json
+        todavía, así que debe caer al default 0.0 sin romper la carga.
+        """
+        spot = get_spot("mdq_playa_grande")
+        self.assertEqual(spot.delta_marea, 0.0)
+
+    def test_actualizar_ajuste_acepta_delta_marea(self):
+        """El comando /ajuste (vía actualizar_ajuste) debe poder calibrar
+        delta_marea igual que delta_altura y factor_periodo."""
+        from core.spots.registry import actualizar_ajuste, get_spot
+
+        spot = get_spot("mdq_playa_grande")
+        valor_original = spot.delta_marea
+        try:
+            actualizar_ajuste("mdq_playa_grande", "delta_marea", 0.15)
+            self.assertEqual(get_spot("mdq_playa_grande").delta_marea, 0.15)
+        finally:
+            actualizar_ajuste("mdq_playa_grande", "delta_marea", valor_original)
+
 
 class TestViento(unittest.TestCase):
     def test_offshore_calmo(self):
@@ -477,6 +499,34 @@ class TestMarea(unittest.TestCase):
 # ------------------------------------------------------------------
 
 class TestScoreTotal(unittest.TestCase):
+    def test_delta_marea_afecta_score_y_flags(self):
+        """
+        Regresión #13 (parte 2, hallazgo de Codex): delta_marea debe
+        aplicarse también al score de marea y sus flags dentro de
+        calcular_score(), no solo a la vista de core/analysis/tides.py —
+        si no, la vista podía mostrar "marea en rango óptimo" mientras el
+        motor seguía puntuando contra el nivel crudo, fuera de rango.
+        """
+        spot = make_spot(marea_min=0.8, marea_max=1.2)
+        spot.delta_marea = 0.9
+        hour = make_hour(altura=1.2, periodo=12, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=0.0)
+        bd = calcular_score(hour, spot)
+
+        # 0.0 + 0.9 = 0.9, dentro de [0.8, 1.2] → score alto, flag positivo.
+        self.assertGreater(bd.score_marea, 0.85)
+        self.assertIn("Marea en rango óptimo", bd.flags_positivos)
+
+    def test_delta_altura_no_afecta_score_ni_flags_de_marea(self):
+        """delta_altura (calibración de swell) no debe filtrarse al score
+        de marea — son campos independientes desde el fix #13."""
+        spot = make_spot(marea_min=0.8, marea_max=1.2, delta_altura=0.9)
+        hour = make_hour(altura=1.2, periodo=12, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=0.0)
+        bd = calcular_score(hour, spot)
+
+        # Sigue en 0.0 (sin ajuste de marea) → fuera de rango, score bajo.
+        self.assertLess(bd.score_marea, 0.70)
+        self.assertNotIn("Marea en rango óptimo", bd.flags_positivos)
+
     def test_condiciones_ideales(self):
         """Offshore + groundswell + marea ok → score alto."""
         spot = make_spot()

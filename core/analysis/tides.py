@@ -79,7 +79,7 @@ def detectar_mareas(
 
     Args:
         forecast: Lista de ForecastHour ordenada cronológicamente.
-        spot: Opcional — solo se usa para ajuste de delta_altura.
+        spot: Opcional — solo se usa para ajuste de delta_marea.
         desde: Si se indica, solo considera eventos a partir de esta hora (UTC).
                Útil para filtrar el pasado y mostrar solo eventos futuros.
 
@@ -95,8 +95,11 @@ def detectar_mareas(
             tiene_extremos_claros=False,
         )
 
-    # Extraer serie de niveles con ajuste de spot si corresponde
-    delta = spot.delta_altura if spot else 0.0
+    # Extraer serie de niveles con ajuste de spot si corresponde. Usa
+    # delta_marea (no delta_altura) — son calibraciones independientes,
+    # una para altura de swell y otra para nivel de marea (regresión #13:
+    # antes reutilizaba delta_altura para ambas cosas).
+    delta = spot.delta_marea if spot else 0.0
     niveles = [h.tide.nivel_m + delta for h in forecast]
     timestamps = [h.timestamp for h in forecast]
 

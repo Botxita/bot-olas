@@ -425,26 +425,57 @@ def test_proxima_alta_sin_eventos():
 
 
 # ---------------------------------------------------------------------------
-# Test de integración: con delta_altura de spot
+# Test de integración: con delta_marea de spot
 # ---------------------------------------------------------------------------
 
-def test_delta_altura_se_aplica():
-    """El delta_altura del spot debe desplazar los niveles reportados."""
+def test_delta_marea_se_aplica():
+    """El delta_marea del spot debe desplazar los niveles reportados."""
     spot_sin_delta = make_spot()
-    spot_sin_delta.delta_altura = 0.0
+    spot_sin_delta.delta_marea = 0.0
 
     spot_con_delta = make_spot()
-    spot_con_delta.delta_altura = 0.3
+    spot_con_delta.delta_marea = 0.3
 
     forecast = make_forecast_senoidal(n_horas=48)
 
     result_sin = detectar_mareas(forecast, spot=spot_sin_delta)
     result_con = detectar_mareas(forecast, spot=spot_con_delta)
 
-    if result_sin.eventos and result_con.eventos:
-        # El nivel del primer evento con delta debe ser ~0.3m mayor
-        diff = result_con.eventos[0].nivel_m - result_sin.eventos[0].nivel_m
-        assert abs(diff - 0.3) < 0.01, f"Diferencia de nivel esperada ~0.3, got {diff:.4f}"
+    assert result_sin.eventos, "El fixture senoidal debería producir eventos detectables"
+    assert result_con.eventos, "El fixture senoidal debería producir eventos detectables"
+
+    # El nivel del primer evento con delta debe ser ~0.3m mayor
+    diff = result_con.eventos[0].nivel_m - result_sin.eventos[0].nivel_m
+    assert abs(diff - 0.3) < 0.01, f"Diferencia de nivel esperada ~0.3, got {diff:.4f}"
+
+
+def test_delta_altura_no_afecta_la_marea():
+    """
+    Regresión #13: delta_altura (calibración de altura de SWELL) y
+    delta_marea (calibración de nivel de MAREA) deben ser independientes.
+    Antes, tides.py reutilizaba delta_altura para desplazar también la
+    marea — un admin que solo quisiera corregir la altura de ola terminaba
+    corriendo la marea reportada sin darse cuenta.
+    """
+    spot_solo_delta_altura = make_spot()
+    spot_solo_delta_altura.delta_altura = 0.5
+    spot_solo_delta_altura.delta_marea = 0.0
+
+    spot_sin_ajustes = make_spot()
+    spot_sin_ajustes.delta_altura = 0.0
+    spot_sin_ajustes.delta_marea = 0.0
+
+    forecast = make_forecast_senoidal(n_horas=48)
+
+    result_con_delta_altura = detectar_mareas(forecast, spot=spot_solo_delta_altura)
+    result_sin_ajustes = detectar_mareas(forecast, spot=spot_sin_ajustes)
+
+    assert result_con_delta_altura.eventos, "El fixture senoidal debería producir eventos detectables"
+    assert result_sin_ajustes.eventos, "El fixture senoidal debería producir eventos detectables"
+
+    diff = result_con_delta_altura.eventos[0].nivel_m - result_sin_ajustes.eventos[0].nivel_m
+    assert abs(diff) < 0.001, \
+        f"delta_altura no debería afectar la marea reportada, pero la desplazó {diff:.4f}m"
 
 
 # ---------------------------------------------------------------------------
@@ -481,7 +512,8 @@ if __name__ == "__main__":
         test_tide_event_str_baja,
         test_proxima_alta_property,
         test_proxima_alta_sin_eventos,
-        test_delta_altura_se_aplica,
+        test_delta_marea_se_aplica,
+        test_delta_altura_no_afecta_la_marea,
     ]
 
     passed = 0

@@ -153,6 +153,11 @@ class SpotConfig:
     # Si está vacía, el engine usa orientacion_costa_deg como único ideal (fallback).
     direcciones_ideales: List[float] = field(default_factory=list)
     delta_altura: float = 0.0
+    # Ajuste de calibración de MAREA, independiente de delta_altura (que
+    # calibra la altura de swell). Antes, tides.py reutilizaba delta_altura
+    # para desplazar también el nivel de marea, acoplando dos correcciones
+    # físicas sin relación necesaria entre sí (regresión #13).
+    delta_marea: float = 0.0
     factor_periodo: float = 1.0
     fuente_datos: str = "open-meteo"
     notas: str = ""

@@ -486,8 +486,9 @@ def test_dia_completo_contiene_todos_los_bloques():
         es_hoy=True,
     )
     assert "CONDICIONES" in s
-    assert "CALIDAD" in s
+    assert "75/100" in s  # bloque de calidad (#A1: ya no hay header "CALIDAD" aparte)
     assert "MAREAS" in s
+    assert s.index("75/100") < s.index("1.5m")  # calidad antes que datos crudos (#A1)
     assert "MEJOR HORA" in s
     assert "🌅" in s  # luz solar
     # Con tide_analysis, el disclaimer de proxy MSL solo debe aparecer una

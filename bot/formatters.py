@@ -484,23 +484,42 @@ def formato_dia_completo(
     # Luz solar
     lineas.append(formato_luz_solar(daylight, spot))
     lineas.append("")
-    lineas.append(SEPARADOR)
 
+    # Título según la rama, seguido siempre por CALIDAD (score + flags
+    # condensados) antes de los datos crudos — mismo criterio que
+    # formato_condiciones_actuales() (#A1): lo que decide si vale la pena
+    # seguir leyendo va primero, no al final.
     if es_hoy:
         lineas.append("*CONDICIONES AHORA*")
     elif mejor_hora is not None:
         mejor_hora_str = _ts_local(h_display.timestamp, spot)
         lineas.append(f"*MEJOR HORA DEL DÍA · {mejor_hora_str} hs*")
-        lineas.append(f"{_estrellas(bd_display.score_total)}  *({bd_display.score_100}/100) · {bd_display.etiqueta}*")
-        lineas.append("")
     else:
         lineas.append("*CONDICIONES*")
+
+    lineas.append(f"{_estrellas(bd_display.score_total)} *{bd_display.score_100}/100 · {bd_display.etiqueta}*")
+    if bd_display.flags_positivos:
+        lineas.append(f"✅ {' · '.join(bd_display.flags_positivos)}")
+    if bd_display.flags_negativos:
+        lineas.append(f"❌ {' · '.join(bd_display.flags_negativos)}")
+    # _formato_marea_inline() (más abajo, línea de marea) siempre muestra el
+    # disclaimer de proxy MSL — omitirlo acá evita duplicarlo. Con
+    # tide_analysis, formato_mareas() se llama con incluir_disclaimer=False
+    # por la misma razón, así que no hay un tercer lugar donde reaparezca.
+    neutros_sin_proxy = [
+        f for f in bd_display.flags_neutros
+        if "proxy MSL" not in f and "proxy_msl" not in f.lower()
+    ]
+    if neutros_sin_proxy:
+        lineas.append(f"ℹ️ {' · '.join(neutros_sin_proxy)}")
+
+    lineas.append("")
+    lineas.append(SEPARADOR)
 
     s = h_display.swell
     w = h_display.wind
     t = h_display.tide
-    lineas.append(f"🌊  Swell:   `{s.altura_m:.1f}m · {s.periodo_s:.0f}s · {_dir_a_texto(s.direccion_deg)}`")
-    lineas.append(f"💨  Viento:  `{w.velocidad_kmh:.0f} km/h · {_dir_a_texto(w.direccion_deg)}`")
+    lineas.append(f"🌊 `{s.altura_m:.1f}m · {s.periodo_s:.0f}s · {_dir_a_texto(s.direccion_deg)}`      💨 `{w.velocidad_kmh:.0f} km/h {_dir_a_texto(w.direccion_deg)}`")
     if w.rafaga_kmh > w.velocidad_kmh * 1.3:
         lineas.append(f"       ↪ Ráfagas: `{w.rafaga_kmh:.0f} km/h`")
     if h_display.temp_agua_c is not None:
@@ -513,27 +532,6 @@ def formato_dia_completo(
             simbolo = "▲" if ev.tipo == "alta" else "▽"
             partes.append(f"{simbolo}{hora_ev}")
         lineas.append(f"       ↪ `{'  '.join(partes)}`")
-    lineas.append("")
-    lineas.append(SEPARADOR)
-
-    # Score + flags
-    if es_hoy or mejor_hora is None:
-        lineas.append("*CALIDAD*")
-        lineas.append(f"{_estrellas(bd_display.score_total)}  *({bd_display.score_100}/100) · {bd_display.etiqueta}*")
-        lineas.append("")
-    for f_pos in bd_display.flags_positivos:
-        lineas.append(f"✅ {f_pos}")
-    for f_neg in bd_display.flags_negativos:
-        lineas.append(f"❌ {f_neg}")
-    for f_neu in bd_display.flags_neutros:
-        # _formato_marea_inline() (más arriba, línea de marea) siempre
-        # muestra el disclaimer de proxy MSL — mostrarlo también acá lo
-        # duplicaría. Con tide_analysis, formato_mareas() se llama con
-        # incluir_disclaimer=False por la misma razón, así que no hay un
-        # tercer lugar donde vuelva a aparecer.
-        es_proxy_msl = "proxy MSL" in f_neu or "proxy_msl" in f_neu.lower()
-        if not es_proxy_msl:
-            lineas.append(f"ℹ️  {f_neu}")
 
     # Mareas del día
     if tide_analysis:

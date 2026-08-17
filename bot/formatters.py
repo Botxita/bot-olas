@@ -133,9 +133,7 @@ def formato_condiciones_actuales(
     for f_neg in breakdown.flags_negativos:
         lineas.append(f"❌ {f_neg}")
     for f_neu in breakdown.flags_neutros:
-        # Omitir el flag técnico de proxy MSL — ya está en el inline de marea
-        if "proxy MSL" not in f_neu and "proxy_msl" not in f_neu.lower():
-            lineas.append(f"ℹ️  {f_neu}")
+        lineas.append(f"ℹ️  {f_neu}")
 
     return "\n".join(lineas)
 
@@ -481,11 +479,13 @@ def formato_dia_completo(
 
     if es_hoy:
         lineas.append("*CONDICIONES AHORA*")
-    else:
+    elif mejor_hora is not None:
         mejor_hora_str = _ts_local(h_display.timestamp, spot)
         lineas.append(f"*MEJOR HORA DEL DÍA · {mejor_hora_str} hs*")
         lineas.append(f"{_estrellas(bd_display.score_total)}  *({bd_display.score_100}/100) · {bd_display.etiqueta}*")
         lineas.append("")
+    else:
+        lineas.append("*CONDICIONES*")
 
     s = h_display.swell
     w = h_display.wind
@@ -508,7 +508,7 @@ def formato_dia_completo(
     lineas.append(SEPARADOR)
 
     # Score + flags
-    if es_hoy:
+    if es_hoy or mejor_hora is None:
         lineas.append("*CALIDAD*")
         lineas.append(f"{_estrellas(bd_display.score_total)}  *({bd_display.score_100}/100) · {bd_display.etiqueta}*")
         lineas.append("")
@@ -517,7 +517,12 @@ def formato_dia_completo(
     for f_neg in bd_display.flags_negativos:
         lineas.append(f"❌ {f_neg}")
     for f_neu in bd_display.flags_neutros:
-        if "proxy MSL" not in f_neu and "proxy_msl" not in f_neu.lower():
+        # Si hay tide_analysis, el bloque MAREAS de más abajo ya aclara
+        # "estimadas, proxy MSL" en su encabezado — mostrar el flag acá
+        # también lo duplicaría. Sin tide_analysis, este flag es la única
+        # aparición del disclaimer.
+        es_proxy_msl = "proxy MSL" in f_neu or "proxy_msl" in f_neu.lower()
+        if not (tide_analysis is not None and es_proxy_msl):
             lineas.append(f"ℹ️  {f_neu}")
 
     # Mareas del día

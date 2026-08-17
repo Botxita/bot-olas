@@ -101,6 +101,15 @@ def scores_dict(forecast):
 SPOT = make_spot()
 FECHA = date(2025, 1, 15)  # verano AR
 
+# Reloj de referencia fijo en el día del fixture — analizar_semana() filtra
+# fechas >= "hoy" contra datetime.now() real por defecto, así que sin esto
+# el forecast anclado en FECHA queda fuera de rango con el paso del tiempo.
+# Mismo patrón que test_weekly_mejor_ventana_semana_desempate_usa_score_real.
+AHORA_FECHA = datetime(
+    FECHA.year, FECHA.month, FECHA.day, 0, 0,
+    tzinfo=ZoneInfo("America/Argentina/Buenos_Aires"),
+).astimezone(timezone.utc)
+
 
 # ===========================================================================
 # TESTS: hourly_view
@@ -285,7 +294,7 @@ def test_hourly_view_solo_horas_nocturnas_no_crashea():
 def test_weekly_retorna_weekly_analysis():
     forecast = make_forecast_dias(FECHA, 7)
     sf = mock_score_fn(scores_dict(forecast))
-    result = analizar_semana(forecast, SPOT, score_fn=sf)
+    result = analizar_semana(forecast, SPOT, score_fn=sf, ahora=AHORA_FECHA)
     assert result is not None
     assert isinstance(result, WeeklyAnalysis)
 
@@ -294,7 +303,7 @@ def test_weekly_cantidad_dias():
     """Debe analizar exactamente los días disponibles (hasta 7)."""
     forecast = make_forecast_dias(FECHA, 5)
     sf = mock_score_fn(scores_dict(forecast))
-    result = analizar_semana(forecast, SPOT, score_fn=sf)
+    result = analizar_semana(forecast, SPOT, score_fn=sf, ahora=AHORA_FECHA)
     assert result is not None
     assert len(result.scores_por_dia) == 5
 
@@ -302,7 +311,7 @@ def test_weekly_cantidad_dias():
 def test_weekly_dias_ordenados_cronologicamente():
     forecast = make_forecast_dias(FECHA, 7)
     sf = mock_score_fn(scores_dict(forecast))
-    result = analizar_semana(forecast, SPOT, score_fn=sf)
+    result = analizar_semana(forecast, SPOT, score_fn=sf, ahora=AHORA_FECHA)
     assert result is not None
     for i in range(1, len(result.scores_por_dia)):
         assert result.scores_por_dia[i].fecha > result.scores_por_dia[i-1].fecha
@@ -331,7 +340,7 @@ def test_weekly_mejor_dia_tiene_mayor_score():
             forecast.append(h)
 
     sf = mock_score_fn({h.timestamp: getattr(h, '_test_score', 0.5) for h in forecast})
-    result = analizar_semana(forecast, SPOT, score_fn=sf)
+    result = analizar_semana(forecast, SPOT, score_fn=sf, ahora=AHORA_FECHA)
     assert result is not None
 
     fecha_esperada = fecha_base + timedelta(days=2)
@@ -343,7 +352,7 @@ def test_weekly_peor_dia_tiene_menor_score():
     """peor_dia debe tener el score_promedio más bajo."""
     forecast = make_forecast_dias(FECHA, 5)
     sf = mock_score_fn(scores_dict(forecast))
-    result = analizar_semana(forecast, SPOT, score_fn=sf)
+    result = analizar_semana(forecast, SPOT, score_fn=sf, ahora=AHORA_FECHA)
     assert result is not None
     for d in result.scores_por_dia:
         if d.tiene_datos:
@@ -354,7 +363,7 @@ def test_weekly_dias_buenos_threshold():
     """dias_buenos debe contener solo días con score_100 >= 55."""
     forecast = make_forecast_dias(FECHA, 5)
     sf = mock_score_fn(scores_dict(forecast))
-    result = analizar_semana(forecast, SPOT, score_fn=sf)
+    result = analizar_semana(forecast, SPOT, score_fn=sf, ahora=AHORA_FECHA)
     assert result is not None
     for d in result.dias_buenos:
         assert d.score_100 >= 55, f"Día {d.fecha} en dias_buenos pero score={d.score_100}"
@@ -395,7 +404,7 @@ def test_weekly_mejor_ventana_semana():
     """mejor_ventana_semana debe ser BestHourResult con el score más alto de la semana."""
     forecast = make_forecast_dias(FECHA, 3)
     sf = mock_score_fn(scores_dict(forecast))
-    result = analizar_semana(forecast, SPOT, score_fn=sf)
+    result = analizar_semana(forecast, SPOT, score_fn=sf, ahora=AHORA_FECHA)
     assert result is not None
     ventana = result.mejor_ventana_semana
     assert ventana is not None
@@ -454,7 +463,7 @@ def test_weekly_max_dias_respetado():
     """Con max_dias=3, no debe analizar más de 3 días aunque haya 7."""
     forecast = make_forecast_dias(FECHA, 7)
     sf = mock_score_fn(scores_dict(forecast))
-    result = analizar_semana(forecast, SPOT, score_fn=sf, max_dias=3)
+    result = analizar_semana(forecast, SPOT, score_fn=sf, max_dias=3, ahora=AHORA_FECHA)
     assert result is not None
     assert len(result.scores_por_dia) == 3
 
@@ -483,7 +492,7 @@ def test_weekly_tiene_datos_false_para_dia_sin_forecast():
     forecast = make_forecast_dias(FECHA, 2)
     # Pedimos analizar 5 días — los últimos 3 no tendrán datos
     sf = mock_score_fn(scores_dict(forecast))
-    result = analizar_semana(forecast, SPOT, score_fn=sf, max_dias=5)
+    result = analizar_semana(forecast, SPOT, score_fn=sf, max_dias=5, ahora=AHORA_FECHA)
     assert result is not None
     # Solo los 2 primeros días deben tener datos
     dias_con = [d for d in result.scores_por_dia if d.tiene_datos]
@@ -591,7 +600,7 @@ def test_weekly_motivo_sin_datos_solo_nocturno():
 def test_weekly_spot_en_resultado():
     forecast = make_forecast_dias(FECHA, 3)
     sf = mock_score_fn(scores_dict(forecast))
-    result = analizar_semana(forecast, SPOT, score_fn=sf)
+    result = analizar_semana(forecast, SPOT, score_fn=sf, ahora=AHORA_FECHA)
     assert result is not None
     assert result.spot.key == SPOT.key
 
@@ -599,7 +608,7 @@ def test_weekly_spot_en_resultado():
 def test_weekly_hay_dias_buenos_property():
     forecast = make_forecast_dias(FECHA, 3)
     sf = mock_score_fn(scores_dict(forecast))
-    result = analizar_semana(forecast, SPOT, score_fn=sf)
+    result = analizar_semana(forecast, SPOT, score_fn=sf, ahora=AHORA_FECHA)
     assert result is not None
     # Con score 0.5 (score_100=50), no hay días buenos
     assert result.hay_dias_buenos is False

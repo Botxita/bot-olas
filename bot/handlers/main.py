@@ -513,6 +513,7 @@ def _mostrar_dia(query, spot_key: str, fecha: date, desde_favoritos: bool = Fals
         texto = formato_dia_completo(
             hour, breakdown, spot,
             daylight, tide_analysis, mejor_hora,
+            es_hoy=(fecha == fecha_hoy),
         )
 
         _safe_edit(query,

@@ -455,13 +455,18 @@ def test_dia_completo_retorna_str():
 def test_dia_completo_contiene_todos_los_bloques():
     s = formato_dia_completo(
         make_hour(), make_breakdown(), SPOT,
-        make_daylight(), make_tide_analysis_con_eventos(), make_best_hour_result()
+        make_daylight(), make_tide_analysis_con_eventos(), make_best_hour_result(),
+        es_hoy=True,
     )
     assert "CONDICIONES" in s
     assert "CALIDAD" in s
     assert "MAREAS" in s
     assert "MEJOR HORA" in s
     assert "🌅" in s  # luz solar
+    # Con tide_analysis, el disclaimer de proxy MSL solo debe aparecer una
+    # vez (en el encabezado del bloque MAREAS) — el flag suelto se filtra
+    # para no duplicarlo.
+    assert s.count("proxy MSL") == 1
 
 
 def test_dia_completo_sin_mejor_hora_ok():
@@ -481,6 +486,9 @@ def test_dia_completo_sin_mareas_ok():
         make_daylight(), None, make_best_hour_result()
     )
     assert isinstance(s, str)
+    # Sin tide_analysis no hay bloque MAREAS — el flag suelto es la única
+    # fuente del disclaimer, no debe filtrarse acá.
+    assert s.count("proxy MSL") == 1
     assert "MAREAS" not in s
 
 

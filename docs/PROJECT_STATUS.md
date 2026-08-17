@@ -43,14 +43,14 @@ tests/ (7 archivos, 169 tests — 154 pasan, 15 fallan)
 | Persistencia | SQLite activo, 3 tablas. Favoritos SÍ tienen persistencia real a nivel de datos (contradice lo que se creía pendiente) — falta confirmar que el handler la usa bien en vivo |
 | Tests | 169 tests, 15 fallan por fixtures con fecha fija 2025 vs. reloj real — no es bug funcional |
 | Restos "Pro" | `_es_pro()` no existe. `es_pro: bool = True` queda como parámetro de compatibilidad intencional |
-| keep_alive.py / Flask Replit | No existe. `Flask==3.0.3` está en `requirements.txt` sin uso visible — a confirmar si es deuda |
+| keep_alive.py / Flask Replit | No existe. `Flask==3.0.3` era deuda muerta (0 usos; webhook y `/health` corren sobre Tornado vía PTB v13) — eliminado de `requirements.txt` |
 
 ## Backlog (por prioridad sugerida)
 
 1. ~~Rotar `TELEGRAM_BOT_TOKEN` y limpiar `.env` del historial de git.~~ Resuelto en `cf0f5fe` (ver Prioridad 1 arriba).
 2. Actualizar los 15 tests con fechas fijas para que no dependan del reloj real.
 3. Verificar en vivo la navegación "atrás" desde favoritos (`bot/handlers/main.py`).
-4. Confirmar si Flask en `requirements.txt` está realmente usado en algún lado o es deuda muerta.
+4. ~~Confirmar si Flask en `requirements.txt` está realmente usado en algún lado o es deuda muerta.~~ Resuelto: era deuda muerta, eliminado.
 5. Onboarding de nivel de surfista (principiante/intermedio/avanzado) para ajustar umbrales de "bueno/regular/malo" — pedido original de Ivan, no implementado.
 6. Resolución horaria de marea con minutos exactos — limitación de datos de Open-Meteo, no bug de formato; evaluar si vale la pena un proveedor de mareas dedicado (Stormglass/WorldTides) a futuro.
 7. Borrar `power.txt` (archivo suelto con ruta local vieja, aparenta ser basura de un `cd`/`activate` pegado por error).

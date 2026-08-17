@@ -1,0 +1,25 @@
+{
+  "pais": "PA",
+  "nombre": "Panamá",
+  "regiones": {
+    "veraguas": {
+      "nombre": "Veraguas (Santa Catalina)",
+      "spots": {
+        "santa_catalina": {
+          "nombre": "Santa Catalina — La Punta",
+          "ciudad": "Santa Catalina",
+          "lat": 7.6342047, "lon": -81.2546103,
+          "orientacion_costa_deg": 190, "tolerancia_swell_deg": 30,
+          "tipo_break": "point", "fondo": "roca",
+          "marea": {"rango_optimo_min_m": 0.5, "rango_optimo_max_m": 2.0, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 1.0, "altura_max_m": 5.0, "periodo_min_s": 13, "direcciones_ideales": [178, 190, 202]},
+          "viento": {"vel_max_offshore_kmh": 25, "vel_max_onshore_kmh": 10},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "La Punta: point break derecho de clase mundial sobre reef rocoso volcánico, con izquierdas ocasionales en días grandes — dirección exacta de ruptura no resuelta del todo entre fuentes, no afecta el scoring. Temporada alta mayo-octubre. Coordenadas OpenStreetMap (poblado, ancla más cercana a La Punta específica); orientación derivada de swell ideal SSW + offshore N (surf-forecast.com/tourismpanama). Calibración numérica reutilizada de Pavones (Costa Rica, point/roca, mismo régimen de swell SW centroamericano y magnitud de ola similar) por decisión explícita de Ivan — sin verificación cartográfica adicional.",
+          "tz": "America/Panama"
+        }
+      }
+    }
+  }
+}

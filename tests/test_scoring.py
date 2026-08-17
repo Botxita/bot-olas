@@ -996,8 +996,11 @@ class TestDetectorVentanas(unittest.TestCase):
         condiciones_ideales = dict(
             altura=1.4, periodo=14, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0
         )
+        # Dos horas contiguas para la ventana cercana — una sola hora no
+        # forma ventana válida desde el fix #26 (mínimo 2h).
         forecast = [
             make_hour(ts=ts_cercana, **condiciones_ideales),
+            make_hour(ts=ts_cercana + timedelta(hours=1), **condiciones_ideales),
             make_hour(ts=ts_lejana, **condiciones_ideales),
         ]
 
@@ -1029,7 +1032,12 @@ class TestDetectorVentanas(unittest.TestCase):
         condiciones_ideales = dict(
             altura=1.4, periodo=14, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0
         )
-        forecast = [make_hour(ts=ts_lejos, **condiciones_ideales)]
+        # Dos horas contiguas — una sola hora no forma ventana válida desde
+        # el fix #26 (mínimo 2h).
+        forecast = [
+            make_hour(ts=ts_lejos, **condiciones_ideales),
+            make_hour(ts=ts_lejos + timedelta(hours=1), **condiciones_ideales),
+        ]
 
         # Con horizonte default (48h) esta hora queda afuera.
         self.assertEqual(detectar_ventanas(forecast, spot, umbral=0.60), [])
@@ -1073,7 +1081,10 @@ class TestDetectorVentanas(unittest.TestCase):
         ahora = datetime.now(timezone.utc)
         ts_falla = (ahora + timedelta(days=1)).replace(hour=15, minute=0, second=0, microsecond=0)
         ts_ok = ts_falla + timedelta(hours=1)
-        forecast = [make_hour(ts=ts_falla), make_hour(ts=ts_ok)]
+        # Segunda hora "ok" contigua — una sola hora sobreviviente no forma
+        # ventana válida desde el fix #26 (mínimo 2h).
+        ts_ok2 = ts_ok + timedelta(hours=1)
+        forecast = [make_hour(ts=ts_falla), make_hour(ts=ts_ok), make_hour(ts=ts_ok2)]
 
         from core.scoring.engine import calcular_score as real_calcular_score
 
@@ -1083,13 +1094,13 @@ class TestDetectorVentanas(unittest.TestCase):
             return real_calcular_score(hour, spot)
 
         with patch("core.windows.detector.calcular_score", side_effect=falla_una_hora):
-            # No debe lanzar, y la hora que sí calcula score debe seguir
-            # disponible (con umbral=0.0 cualquier score válido forma ventana).
+            # No debe lanzar, y las horas que sí calculan score deben seguir
+            # disponibles (con umbral=0.0 cualquier score válido forma ventana).
             ventanas = detectar_ventanas(forecast, spot, umbral=0.0)
             self.assertIsInstance(ventanas, list)
             self.assertTrue(
                 any(v.inicio == ts_ok for v in ventanas),
-                f"La hora que sí calculó score ({ts_ok}) debería formar una ventana: {ventanas}",
+                f"Las horas que sí calcularon score ({ts_ok}) deberían formar una ventana: {ventanas}",
             )
 
     def test_hueco_de_datos_corta_la_ventana(self):
@@ -1179,6 +1190,30 @@ class TestDetectorVentanas(unittest.TestCase):
         self.assertEqual(inicios, [ts_22, ts_00])
         for v in ventanas:
             self.assertEqual(v.horas_count, 2)
+
+    def test_ventana_de_una_hora_no_se_genera(self):
+        """
+        Regresión #26: una hora buena aislada entre dos malas (contrato
+        documentado en bot/handlers/main.py: "ventana más cercana, mínimo
+        2h") no debe generar una ventana de horas_count=1. Ejemplo exacto
+        del hallazgo: 09:00=0.40, 10:00=0.61, 11:00=0.40.
+        """
+        spot = make_spot()
+        ahora = datetime.now(timezone.utc)
+        # hour=15 UTC ~ mediodía AR (UTC-3), daylight seguro en cualquier
+        # época del año — igual criterio que otros tests de esta clase.
+        base = (ahora + timedelta(days=1)).replace(hour=15, minute=0, second=0, microsecond=0)
+
+        cond_mala = dict(altura=0.2, periodo=5, dir_swell=0, vel_viento=30, dir_viento=90, nivel_marea=2.5)
+        cond_buena = dict(altura=1.4, periodo=14, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0)
+        forecast = [
+            make_hour(ts=base, **cond_mala),
+            make_hour(ts=base + timedelta(hours=1), **cond_buena),
+            make_hour(ts=base + timedelta(hours=2), **cond_mala),
+        ]
+
+        ventanas = detectar_ventanas(forecast, spot, umbral=0.55)
+        self.assertEqual(ventanas, [], f"Una sola hora buena no debería formar ventana: {ventanas}")
 
     def test_ventana_en_curso_recorta_horas_ya_pasadas(self):
         """

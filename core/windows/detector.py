@@ -188,6 +188,14 @@ def detectar_ventanas(
         ]
         if not group_vigente:
             continue
+        # Contrato documentado en bot/handlers/main.py ("ventana más
+        # cercana, mínimo 2h"): una ventana de una sola hora no es una
+        # recomendación útil — antes, un grupo de tamaño 1 (ej. una única
+        # hora sobre el umbral entre dos que no lo superan, o una ventana
+        # en curso recortada por #24 hasta quedar con 1h vigente) se
+        # construía igual y se mostraba como ventana válida (#26).
+        if len(group_vigente) < 2:
+            continue
         ventana = _construir_ventana(group_vigente, spot)
         if ventana:
             ventanas.append(ventana)

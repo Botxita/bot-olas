@@ -1,0 +1,25 @@
+{
+  "pais": "SV",
+  "nombre": "El Salvador",
+  "regiones": {
+    "la_libertad": {
+      "nombre": "La Libertad",
+      "spots": {
+        "el_sunzal": {
+          "nombre": "El Sunzal",
+          "ciudad": "El Sunzal",
+          "lat": 13.4949507, "lon": -89.3888091,
+          "orientacion_costa_deg": 202, "tolerancia_swell_deg": 30,
+          "tipo_break": "point", "fondo": "roca",
+          "marea": {"rango_optimo_min_m": 0.5, "rango_optimo_max_m": 2.0, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 1.0, "altura_max_m": 5.0, "periodo_min_s": 13, "direcciones_ideales": [190, 202, 215]},
+          "viento": {"vel_max_offshore_kmh": 25, "vel_max_onshore_kmh": 10},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Point break derecho largo y manso sobre canto rodado, hasta 200-500m de recorrido. Ideal para longboard e intermedios. Coordenadas OpenStreetMap; orientación derivada de swell ideal SSW + offshore NNE (surf-forecast.com). Calibración numérica (tolerancia, altura, período, viento, marea) reutilizada de Pavones (Costa Rica, point/roca, mismo régimen de swell SW centroamericano) por decisión explícita de Ivan, pese a que Pavones es una ola de mayor tamaño típico — sin verificación cartográfica adicional.",
+          "tz": "America/El_Salvador"
+        }
+      }
+    }
+  }
+}

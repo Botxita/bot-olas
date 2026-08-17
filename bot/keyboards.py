@@ -12,6 +12,8 @@ Convenciones de callback_data:
   back:<destino>
   back:spot:<spot_key>:<origen>
   back:favoritos                        ← pantalla "Mis favoritos"
+  back:fecha:<spot_key>:<origen>        ← selector de 7 días (#A3.2)
+  horaria:<spot_key>:<fecha_iso>:<origen>  ← hora a hora de un día específico (#A3.3)
   nivel:<principiante|intermedio|avanzado>  ← onboarding / comando /nivel (#A2)
 
 <origen> viaja en el propio callback_data (no en la sesión) — el país/región
@@ -168,7 +170,7 @@ def kb_menu_spot(
         ],
         # Fila 3: semana + breakdown
         [
-            InlineKeyboardButton("📅 Esta semana",  callback_data=f"action:semana:{spot_key}:{origen}"),
+            InlineKeyboardButton("🗓️ Esta semana",  callback_data=f"action:semana:{spot_key}:{origen}"),
             InlineKeyboardButton("🔬 Breakdown",    callback_data=f"action:breakdown:{spot_key}:{origen}"),
         ],
         # Fila 4: favorito (sola, no compite en peso visual con Volver — #A1)
@@ -232,9 +234,28 @@ def kb_post_forecast(
     spot_key: str,
     es_pro: bool = True,    # ignorado, mantenido por compatibilidad
     desde_favoritos: bool = False,
+    volver_data: str = None,
+    fecha_horaria: date = None,
 ) -> InlineKeyboardMarkup:
-    """Botones que aparecen después de mostrar cualquier resultado."""
+    """
+    Botones que aparecen después de mostrar cualquier resultado.
+
+    volver_data: destino de "Volver" (callback_data completo). None = el
+    default de siempre, back:spot:<spot_key>:<origen> (menú del spot).
+    Lo usa _mostrar_dia() (#A3.2) para que "Volver" desde el detalle de
+    un día vuelva al selector de 7 días en vez de saltar al menú del
+    spot, perdiendo la fecha que se estaba mirando.
+
+    fecha_horaria: si se pasa, el botón "Hora a hora" lleva esa fecha
+    específica en vez de asumir "hoy" (#A3.3) — lo usa _mostrar_dia()
+    para que "Hora a hora" respete el día que se estaba mirando.
+    """
     origen = "fav" if desde_favoritos else ""
+    if fecha_horaria is not None:
+        cb_horaria = f"horaria:{spot_key}:{fecha_horaria.isoformat()}:{origen}"
+    else:
+        cb_horaria = f"action:horaria:{spot_key}:{origen}"
+    volver_data = volver_data or f"back:spot:{spot_key}:{origen}"
     botones = [
         [
             InlineKeyboardButton("🌊 Ahora",   callback_data=f"action:ahora:{spot_key}:{origen}"),
@@ -242,14 +263,14 @@ def kb_post_forecast(
         ],
         [
             InlineKeyboardButton("🏄 Próximas olas", callback_data=f"action:ventanas:{spot_key}:{origen}"),
-            InlineKeyboardButton("📊 Hora a hora",  callback_data=f"action:horaria:{spot_key}:{origen}"),
+            InlineKeyboardButton("📊 Hora a hora",  callback_data=cb_horaria),
         ],
         [
-            InlineKeyboardButton("📅 Esta semana",  callback_data=f"action:semana:{spot_key}:{origen}"),
+            InlineKeyboardButton("🗓️ Esta semana",  callback_data=f"action:semana:{spot_key}:{origen}"),
             InlineKeyboardButton("🔬 Breakdown",    callback_data=f"action:breakdown:{spot_key}:{origen}"),
         ],
         [
-            InlineKeyboardButton("⬅️ Volver", callback_data=f"back:spot:{spot_key}:{origen}"),
+            InlineKeyboardButton("⬅️ Volver", callback_data=volver_data),
         ],
     ]
     return InlineKeyboardMarkup(botones)
@@ -285,6 +306,25 @@ def kb_nivel() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🏄 Intermedio", callback_data="nivel:intermedio")],
         [InlineKeyboardButton("🔥 Avanzado", callback_data="nivel:avanzado")],
     ])
+
+
+# ------------------------------------------------------------------
+# kb_volver: pantallas de error sin navegación propia (#A3.1)
+# ------------------------------------------------------------------
+
+def kb_volver(destino: str) -> InlineKeyboardMarkup:
+    """
+    Teclado de un solo botón "Volver" hacia `destino` (callback_data
+    completo, ej. "back:paises"). Antes, varios estados de error
+    (país/región sin datos, spot no encontrado, callback malformado)
+    respondían con query.message.reply_text() — un mensaje nuevo sin
+    ningún botón, dejando el mensaje anterior (con botones desactualizados)
+    todavía en pantalla. Con esto, esos errores editan el mensaje activo
+    y siempre dejan una salida.
+    """
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("⬅️ Volver", callback_data=destino),
+    ]])
 
 
 # ------------------------------------------------------------------

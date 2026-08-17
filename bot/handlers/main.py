@@ -71,6 +71,7 @@ from bot.keyboards import (
     kb_seleccion_fecha,
     kb_favoritos,
     kb_nivel,
+    kb_volver,
 )
 
 logger = logging.getLogger(__name__)
@@ -318,10 +319,34 @@ def handle_callback(update: Update, context: CallbackContext):
                 fecha = date.fromisoformat(fecha_iso)
                 _mostrar_dia(query, spot_key, fecha, desde_favoritos=desde_favoritos)
             except ValueError:
-                query.message.reply_text("❌ Fecha inválida.")
+                # Ídem #A3.1
+                origen_cb = "fav" if desde_favoritos else ""
+                _safe_edit(query, "❌ Fecha inválida.",
+                    reply_markup=kb_volver(f"back:spot:{spot_key}:{origen_cb}"))
         else:
             # Sin fecha → mostrar selector
             _cb_mostrar_selector_fecha(query, data[6:])
+
+    elif data.startswith("horaria:"):
+        # horaria:<spot_key>:<fecha_iso>:<origen> — hora a hora de un día
+        # específico (#A3.3), distinto de action:horaria: que siempre usa
+        # hoy. Lo genera kb_post_forecast(fecha_horaria=...) desde la
+        # vista de un día por fecha.
+        parts = data[8:].split(":")
+        if len(parts) >= 2:
+            spot_key, fecha_iso = parts[0], parts[1]
+            desde_favoritos = len(parts) > 2 and parts[2] == "fav"
+            try:
+                fecha = date.fromisoformat(fecha_iso)
+                spot = get_spot(spot_key)
+                _mostrar_horaria(query, spot_key, spot, fecha, desde_favoritos=desde_favoritos)
+            except ValueError:
+                origen_cb = "fav" if desde_favoritos else ""
+                _safe_edit(query, "❌ Fecha inválida.",
+                    reply_markup=kb_volver(f"back:spot:{spot_key}:{origen_cb}"))
+            except KeyError:
+                destino = "back:favoritos" if desde_favoritos else "back:paises"
+                _safe_edit(query, "❌ Spot no encontrado.", reply_markup=kb_volver(destino))
 
     elif data.startswith("back:"):
         _cb_back(query, user_id, data[5:])
@@ -352,14 +377,20 @@ def _cb_pais(query, user_id: int, pais_key: str):
     regiones = listar_regiones(pais_key)
 
     if not regiones:
-        query.message.reply_text("No hay regiones configuradas para este país todavía.")
+        # Edita el mensaje activo en vez de mandar uno nuevo sin botones
+        # (#A3.1) — antes esto dejaba 2 mensajes en pantalla: el viejo
+        # (con botones desactualizados) y este, sin ninguna salida.
+        _safe_edit(query,
+            "No hay regiones configuradas para este país todavía.",
+            reply_markup=kb_volver("back:paises"),
+        )
         return
 
     if len(regiones) == 1:
         _cb_region(query, user_id, pais_key, regiones[0][0])
         return
 
-    _safe_edit(query, 
+    _safe_edit(query,
         "📍 Seleccioná la región:",
         reply_markup=kb_seleccion_region(pais_key, regiones),
     )
@@ -370,10 +401,22 @@ def _cb_region(query, user_id: int, pais_key: str, region_key: str):
     spots = listar_spots_region(pais_key, region_key)
 
     if not spots:
-        query.message.reply_text("No hay spots configurados en esta región.")
+        # Ídem #A3.1
+        _safe_edit(query,
+            "No hay spots configurados en esta región.",
+            reply_markup=kb_volver(f"back:regiones:{pais_key}"),
+        )
         return
 
-    _safe_edit(query, 
+    if len(spots) == 1:
+        # Si la región tiene un solo spot, saltar directo a su menú —
+        # mismo criterio ya aplicado a país→región cuando hay 1 sola
+        # región (#A3.6, antes era asimétrico: se saltaba un nivel pero
+        # no el siguiente).
+        _cb_spot(query, user_id, spots[0][0])
+        return
+
+    _safe_edit(query,
         "🏄 Elegí tu spot:",
         reply_markup=kb_seleccion_spot(pais_key, region_key, spots),
     )
@@ -383,7 +426,10 @@ def _cb_spot(query, user_id: int, spot_key: str, desde_favoritos: bool = False):
     try:
         spot = get_spot(spot_key)
     except KeyError:
-        query.message.reply_text("❌ Spot no encontrado.")
+        # Ídem #A3.1. Si venía de favoritos, "Volver" va a Mis favoritos
+        # (de donde salió el spot ahora inexistente); si no, a países.
+        destino = "back:favoritos" if desde_favoritos else "back:paises"
+        _safe_edit(query, "❌ Spot no encontrado.", reply_markup=kb_volver(destino))
         return
 
     session_store.update_session(user_id, step="menu_spot", spot_key=spot_key)
@@ -424,13 +470,18 @@ def _cb_spot(query, user_id: int, spot_key: str, desde_favoritos: bool = False):
 
 def _cb_action(query, user_id: int, accion: str, spot_key: str, desde_favoritos: bool = False):
     if not spot_key:
-        query.message.reply_text("❌ No hay spot seleccionado.")
+        # Ídem #A3.1. Mismo criterio que "spot no encontrado" más abajo:
+        # el origen (favoritos vs. navegación normal) se conoce igual,
+        # aunque no haya spot_key.
+        destino = "back:favoritos" if desde_favoritos else "back:paises"
+        _safe_edit(query, "❌ No hay spot seleccionado.", reply_markup=kb_volver(destino))
         return
 
     try:
         spot = get_spot(spot_key)
     except KeyError:
-        query.message.reply_text("❌ Spot no encontrado.")
+        destino = "back:favoritos" if desde_favoritos else "back:paises"
+        _safe_edit(query, "❌ Spot no encontrado.", reply_markup=kb_volver(destino))
         return
 
     if accion == "ahora":
@@ -547,7 +598,7 @@ def _mostrar_dia(query, spot_key: str, fecha: date, desde_favoritos: bool = Fals
                 if not horas_del_dia:
                     _safe_edit(query,
                         f"⚠️ No hay datos de pronóstico para {fecha.strftime('%d/%m')}.\n"
-                        "El pronóstico cubre hasta 48h desde ahora.",
+                        "El pronóstico cubre los próximos 7 días.",
                         reply_markup=kb_seleccion_fecha(spot_key, fecha_hoy, desde_favoritos=desde_favoritos),
                     )
                     return
@@ -574,10 +625,18 @@ def _mostrar_dia(query, spot_key: str, fecha: date, desde_favoritos: bool = Fals
             es_hoy=(fecha == fecha_hoy),
         )
 
+        origen = "fav" if desde_favoritos else ""
         _safe_edit(query,
             texto,
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=kb_post_forecast(spot_key, desde_favoritos=desde_favoritos),
+            reply_markup=kb_post_forecast(
+                spot_key, desde_favoritos=desde_favoritos,
+                # "Volver" va al selector de 7 días, no al menú del spot
+                # (#A3.2) — y "Hora a hora" respeta la fecha que se está
+                # viendo, no siempre "hoy" (#A3.3).
+                volver_data=f"back:fecha:{spot_key}:{origen}",
+                fecha_horaria=fecha,
+            ),
         )
     except Exception as e:
         logger.exception("Error en _mostrar_dia: %s", e)
@@ -619,10 +678,26 @@ def _mostrar_horaria(query, spot_key: str, spot, fecha: date, desde_favoritos: b
         forecast = _get_forecast_cached(spot_key)
         view = generar_vista_horaria(forecast, spot, fecha, incluir_noche=True)
 
+        # Si fecha no es hoy, preserva el contexto de fecha en el propio
+        # teclado (#A3.2/#A3.3 completo): "Hora a hora" sigue apuntando al
+        # mismo día en vez de saltar a hoy, y "Volver" va al selector de
+        # 7 días en vez del menú del spot. Si es hoy, el comportamiento
+        # observable es el mismo que antes de A3 (vuelve al menú del
+        # spot) aunque el callback_data de "Hora a hora" cambia de
+        # action:horaria:... a horaria:...:<fecha_iso>:... — equivalente
+        # en efecto, no en el string.
+        origen = "fav" if desde_favoritos else ""
+        es_hoy = fecha == _fecha_local_hoy(spot)
+        volver_data = None if es_hoy else f"back:fecha:{spot_key}:{origen}"
+        kb = kb_post_forecast(
+            spot_key, desde_favoritos=desde_favoritos,
+            volver_data=volver_data, fecha_horaria=fecha,
+        )
+
         if view is None:
             _safe_edit(query,
                 f"⚠️ No hay datos para {fecha.strftime('%d/%m')}.",
-                reply_markup=kb_post_forecast(spot_key, desde_favoritos=desde_favoritos),
+                reply_markup=kb,
             )
             return
 
@@ -630,7 +705,7 @@ def _mostrar_horaria(query, spot_key: str, spot, fecha: date, desde_favoritos: b
         _safe_edit(query,
             texto,
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=kb_post_forecast(spot_key, desde_favoritos=desde_favoritos),
+            reply_markup=kb,
         )
     except Exception as e:
         logger.exception("Error en _mostrar_horaria: %s", e)
@@ -687,29 +762,31 @@ def _mostrar_breakdown(query, spot_key: str, spot, desde_favoritos: bool = False
 # Navegación: back
 # ------------------------------------------------------------------
 
+def _mostrar_menu_paises(query, user_id: int):
+    """Pantalla de selección de país — destino común de "Volver" desde
+    varios puntos. Antes este texto+teclado estaba duplicado 3 veces
+    dentro de _cb_back(), una fuente de verdad distinta por cada destino
+    lógico (#A3.8)."""
+    session_store.update_session(user_id, step="seleccion_pais")
+    paises = listar_paises()
+    favs = _resolver_nombres_favoritos(session_store.get_favoritos(user_id))
+    _safe_edit(query,
+        "¿Dónde vas a surfear? 🏄‍♂️🌍",
+        reply_markup=kb_seleccion_pais(paises, favoritos=favs),
+    )
+
+
 def _cb_back(query, user_id: int, destino: str):
     if destino == "favoritos":
         _mostrar_favoritos(query, user_id)
     elif destino == "paises":
-        session_store.update_session(user_id, step="seleccion_pais")
-        paises = listar_paises()
-        favs = _resolver_nombres_favoritos(session_store.get_favoritos(user_id))
-        _safe_edit(query,
-            "¿Dónde vas a surfear? 🏄‍♂️🌍",
-            reply_markup=kb_seleccion_pais(paises, favoritos=favs),
-        )
+        _mostrar_menu_paises(query, user_id)
     elif destino.startswith("regiones:"):
         pais_key = destino.split(":")[1]
         # Si el país tiene una sola región, volver directo a países
         regiones = listar_regiones(pais_key)
         if len(regiones) <= 1:
-            session_store.update_session(user_id, step="seleccion_pais")
-            paises = listar_paises()
-            favs = _resolver_nombres_favoritos(session_store.get_favoritos(user_id))
-            _safe_edit(query,
-                "¿Dónde vas a surfear? 🏄‍♂️🌍",
-                reply_markup=kb_seleccion_pais(paises, favoritos=favs),
-            )
+            _mostrar_menu_paises(query, user_id)
         else:
             _cb_pais(query, user_id, pais_key)
     elif destino.startswith("spots:"):
@@ -718,16 +795,21 @@ def _cb_back(query, user_id: int, destino: str):
             pais_key, region_key = parts[1], parts[2]
             _cb_region(query, user_id, pais_key, region_key)
         else:
-            paises = listar_paises()
-            favs = _resolver_nombres_favoritos(session_store.get_favoritos(user_id))
-            _safe_edit(query, "¿Dónde vas a surfear? 🏄‍♂️🌍",
-                reply_markup=kb_seleccion_pais(paises, favoritos=favs))
+            _mostrar_menu_paises(query, user_id)
     elif destino.startswith("spot:"):
         # back:spot:<spot_key>:<origen>
         parts = destino.split(":")
         spot_key = parts[1]
         desde_favoritos = len(parts) > 2 and parts[2] == "fav"
         _cb_spot(query, user_id, spot_key, desde_favoritos=desde_favoritos)
+    elif destino.startswith("fecha:"):
+        # back:fecha:<spot_key>:<origen> — vuelve al selector de 7 días,
+        # no al menú del spot (#A3.2): "Volver" desde el detalle de un
+        # día debía saltar 2 pasos atrás para probar otra fecha.
+        parts = destino.split(":")
+        spot_key = parts[1]
+        desde_favoritos = len(parts) > 2 and parts[2] == "fav"
+        _cb_mostrar_selector_fecha(query, spot_key, desde_favoritos=desde_favoritos)
 
 
 def _mostrar_favoritos(query, user_id: int):
@@ -789,12 +871,35 @@ def _cb_fav_del(query, user_id: int, spot_key: str, desde_favoritos: bool = Fals
 # ------------------------------------------------------------------
 
 def _cb_nivel(query, user_id: int, nivel: str):
-    """Guarda el nivel elegido (onboarding o /nivel) y sigue al menú principal."""
+    """Guarda el nivel elegido (onboarding o /nivel) y sigue la navegación."""
     if nivel not in NOMBRE_NIVEL:
         logger.warning("Nivel desconocido en callback: %s", nivel)
         return
 
+    # Spot que se estaba mirando ANTES de tocar /nivel — se lee antes de
+    # pisar el estado, para poder volver ahí en vez de reiniciar la
+    # navegación desde países (#A3.7). Exige step == "menu_spot": spot_key
+    # queda en el estado indefinidamente (nada lo borra al volver a
+    # países/regiones), así que sin este chequeo un usuario que visitó un
+    # spot, volvió a países y recién ahí tocó /nivel terminaría de vuelta
+    # en ese spot viejo en vez del menú principal (bug real encontrado en
+    # revisión de Codex). "menu_spot" también cubre estar en cualquier
+    # pantalla de resultado del spot (Ahora/Ventanas/etc. no cambian
+    # step), que es el caso que sí queremos preservar.
+    estado = session_store.get_session(user_id)
+    spot_key_previo = estado.get("spot_key") if estado.get("step") == "menu_spot" else None
+
     session_store.set_nivel(user_id, nivel)
+
+    if spot_key_previo:
+        try:
+            get_spot(spot_key_previo)
+            query.answer(f"✅ Nivel: {NOMBRE_NIVEL[nivel]}")
+            _cb_spot(query, user_id, spot_key_previo)
+            return
+        except KeyError:
+            pass  # el spot ya no existe — cae al menú principal de abajo
+
     session_store.update_session(user_id, step="seleccion_pais")
 
     first_name = escape_markdown(query.from_user.first_name or "surfer", version=2)

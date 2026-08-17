@@ -229,10 +229,11 @@ def handle_callback(update: Update, context: CallbackContext):
         return  # Botones decorativos
 
     if data.startswith("spot_from_home:"):
-        # Spot abierto desde pantalla de inicio (favoritos) → limpiar pais/region de sesión
+        # Spot abierto desde el contexto de favoritos (home o pantalla
+        # "Mis favoritos") — el país/región del spot se derivan de
+        # spot.pais/spot.region dentro de _cb_spot, no de la sesión.
         spot_key = data[15:]
-        session_store.update_session(user_id, step="menu_spot", pais="", region="")
-        _cb_spot(query, user_id, spot_key)
+        _cb_spot(query, user_id, spot_key, desde_favoritos=True)
 
     elif data.startswith("pais:"):
         _cb_pais(query, user_id, data[5:])
@@ -246,19 +247,22 @@ def handle_callback(update: Update, context: CallbackContext):
         _cb_spot(query, user_id, data[5:])
 
     elif data.startswith("action:"):
-        parts = data[7:].split(":", 1)
+        # action:<accion>:<spot_key>:<origen>
+        parts = data[7:].split(":")
         accion = parts[0]
-        arg = parts[1] if len(parts) > 1 else ""
-        _cb_action(query, user_id, accion, arg)
+        spot_key = parts[1] if len(parts) > 1 else ""
+        desde_favoritos = len(parts) > 2 and parts[2] == "fav"
+        _cb_action(query, user_id, accion, spot_key, desde_favoritos=desde_favoritos)
 
     elif data.startswith("fecha:"):
-        # fecha:<spot_key>:<YYYY-MM-DD>
-        parts = data[6:].split(":", 1)
-        if len(parts) == 2:
-            spot_key, fecha_iso = parts
+        # fecha:<spot_key>:<YYYY-MM-DD>:<origen>
+        parts = data[6:].split(":")
+        if len(parts) >= 2:
+            spot_key, fecha_iso = parts[0], parts[1]
+            desde_favoritos = len(parts) > 2 and parts[2] == "fav"
             try:
                 fecha = date.fromisoformat(fecha_iso)
-                _mostrar_dia(query, spot_key, fecha)
+                _mostrar_dia(query, spot_key, fecha, desde_favoritos=desde_favoritos)
             except ValueError:
                 query.message.reply_text("❌ Fecha inválida.")
         else:
@@ -269,10 +273,14 @@ def handle_callback(update: Update, context: CallbackContext):
         _cb_back(query, user_id, data[5:])
 
     elif data.startswith("fav_add:"):
-        _cb_fav_add(query, user_id, data[8:])
+        parts = data[8:].split(":")
+        desde_favoritos = len(parts) > 1 and parts[1] == "fav"
+        _cb_fav_add(query, user_id, parts[0], desde_favoritos=desde_favoritos)
 
     elif data.startswith("fav_del:"):
-        _cb_fav_del(query, user_id, data[8:])
+        parts = data[8:].split(":")
+        desde_favoritos = len(parts) > 1 and parts[1] == "fav"
+        _cb_fav_del(query, user_id, parts[0], desde_favoritos=desde_favoritos)
 
     else:
         logger.warning("Callback desconocido: %s", data)
@@ -283,7 +291,7 @@ def handle_callback(update: Update, context: CallbackContext):
 # ------------------------------------------------------------------
 
 def _cb_pais(query, user_id: int, pais_key: str):
-    session_store.update_session(user_id, step="seleccion_region", pais=pais_key)
+    session_store.update_session(user_id, step="seleccion_region")
     regiones = listar_regiones(pais_key)
 
     if not regiones:
@@ -301,7 +309,7 @@ def _cb_pais(query, user_id: int, pais_key: str):
 
 
 def _cb_region(query, user_id: int, pais_key: str, region_key: str):
-    session_store.update_session(user_id, step="seleccion_spot", region=region_key)
+    session_store.update_session(user_id, step="seleccion_spot")
     spots = listar_spots_region(pais_key, region_key)
 
     if not spots:
@@ -314,7 +322,7 @@ def _cb_region(query, user_id: int, pais_key: str, region_key: str):
     )
 
 
-def _cb_spot(query, user_id: int, spot_key: str):
+def _cb_spot(query, user_id: int, spot_key: str, desde_favoritos: bool = False):
     try:
         spot = get_spot(spot_key)
     except KeyError:
@@ -336,15 +344,20 @@ def _cb_spot(query, user_id: int, spot_key: str):
     if spot.notas:
         texto += f"\n_{spot.notas}_"
 
-    # Leer pais y region de la sesión para el botón Volver
-    session = session_store.get_session(user_id)
-    pais_key = session.get("pais", "") if session else ""
-    region_key = session.get("region", "") if session else ""
+    # País/región para el botón Volver: derivados del propio spot
+    # (SpotConfig), no de la sesión — la sesión es estado global mutable
+    # por usuario y podía pisarse entre mensajes/pantallas (#B1). Solo se
+    # usan cuando NO viene de favoritos (ver kb_menu_spot).
+    pais_key = spot.pais.lower()
+    region_key = spot.region
 
     _safe_edit(query,
         texto,
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=kb_menu_spot(spot_key, es_favorito=es_fav, pais_key=pais_key, region_key=region_key),
+        reply_markup=kb_menu_spot(
+            spot_key, es_favorito=es_fav, pais_key=pais_key, region_key=region_key,
+            desde_favoritos=desde_favoritos,
+        ),
     )
 
 
@@ -352,7 +365,7 @@ def _cb_spot(query, user_id: int, spot_key: str):
 # Router de acciones del menú del spot
 # ------------------------------------------------------------------
 
-def _cb_action(query, user_id: int, accion: str, spot_key: str):
+def _cb_action(query, user_id: int, accion: str, spot_key: str, desde_favoritos: bool = False):
     if not spot_key:
         query.message.reply_text("❌ No hay spot seleccionado.")
         return
@@ -364,24 +377,24 @@ def _cb_action(query, user_id: int, accion: str, spot_key: str):
         return
 
     if accion == "ahora":
-        _mostrar_ahora(query, spot_key, spot)
+        _mostrar_ahora(query, spot_key, spot, desde_favoritos=desde_favoritos)
 
     elif accion == "fecha":
-        _cb_mostrar_selector_fecha(query, spot_key)
+        _cb_mostrar_selector_fecha(query, spot_key, desde_favoritos=desde_favoritos)
 
     elif accion == "ventanas":
-        _mostrar_ventanas(query, spot_key, spot)
+        _mostrar_ventanas(query, spot_key, spot, desde_favoritos=desde_favoritos)
 
     elif accion == "horaria":
         # Hora a hora: usa el día de hoy en la tz del spot
         fecha_hoy = _fecha_local_hoy(spot)
-        _mostrar_horaria(query, spot_key, spot, fecha_hoy)
+        _mostrar_horaria(query, spot_key, spot, fecha_hoy, desde_favoritos=desde_favoritos)
 
     elif accion == "semana":
-        _mostrar_semana(query, spot_key, spot)
+        _mostrar_semana(query, spot_key, spot, desde_favoritos=desde_favoritos)
 
     elif accion == "breakdown":
-        _mostrar_breakdown(query, spot_key, spot)
+        _mostrar_breakdown(query, spot_key, spot, desde_favoritos=desde_favoritos)
 
     else:
         logger.warning("Acción desconocida: %s para spot %s", accion, spot_key)
@@ -391,7 +404,7 @@ def _cb_action(query, user_id: int, accion: str, spot_key: str):
 # Acciones concretas
 # ------------------------------------------------------------------
 
-def _mostrar_ahora(query, spot_key: str, spot):
+def _mostrar_ahora(query, spot_key: str, spot, desde_favoritos: bool = False):
     """Condiciones actuales + tendencia de marea + ventanas próximas + mejor hora de hoy."""
     try:
         _safe_edit(query, "⏳ Consultando pronóstico...")
@@ -420,17 +433,17 @@ def _mostrar_ahora(query, spot_key: str, spot):
             from bot.formatters import formato_mejor_hora
             texto += f"\n\n{formato_mejor_hora(mejor, spot)}"
 
-        _safe_edit(query, 
+        _safe_edit(query,
             texto,
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=kb_post_forecast(spot_key),
+            reply_markup=kb_post_forecast(spot_key, desde_favoritos=desde_favoritos),
         )
     except Exception as e:
         logger.exception("Error en _mostrar_ahora: %s", e)
         _safe_edit(query, formato_no_disponible(spot, str(e)))
 
 
-def _cb_mostrar_selector_fecha(query, spot_key: str):
+def _cb_mostrar_selector_fecha(query, spot_key: str, desde_favoritos: bool = False):
     """Muestra el selector de 7 días para consulta por fecha."""
     try:
         spot = get_spot(spot_key)
@@ -438,13 +451,13 @@ def _cb_mostrar_selector_fecha(query, spot_key: str):
     except KeyError:
         fecha_base = date.today()
 
-    _safe_edit(query, 
+    _safe_edit(query,
         "📅 ¿Para qué día querés ver las condiciones?",
-        reply_markup=kb_seleccion_fecha(spot_key, fecha_base),
+        reply_markup=kb_seleccion_fecha(spot_key, fecha_base, desde_favoritos=desde_favoritos),
     )
 
 
-def _mostrar_dia(query, spot_key: str, fecha: date):
+def _mostrar_dia(query, spot_key: str, fecha: date, desde_favoritos: bool = False):
     """
     Vista completa para un día específico:
     condiciones de esa hora + luz solar + mareas + mejor hora.
@@ -474,10 +487,10 @@ def _mostrar_dia(query, spot_key: str, fecha: date):
                     if h.timestamp.astimezone(tz).date() == fecha
                 ]
                 if not horas_del_dia:
-                    _safe_edit(query, 
+                    _safe_edit(query,
                         f"⚠️ No hay datos de pronóstico para {fecha.strftime('%d/%m')}.\n"
                         "El pronóstico cubre hasta 48h desde ahora.",
-                        reply_markup=kb_seleccion_fecha(spot_key, fecha_hoy),
+                        reply_markup=kb_seleccion_fecha(spot_key, fecha_hoy, desde_favoritos=desde_favoritos),
                     )
                     return
                 hour = horas_del_dia[len(horas_del_dia) // 2]  # hora del mediodía
@@ -502,10 +515,10 @@ def _mostrar_dia(query, spot_key: str, fecha: date):
             daylight, tide_analysis, mejor_hora,
         )
 
-        _safe_edit(query, 
+        _safe_edit(query,
             texto,
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=kb_post_forecast(spot_key),
+            reply_markup=kb_post_forecast(spot_key, desde_favoritos=desde_favoritos),
         )
     except Exception as e:
         logger.exception("Error en _mostrar_dia: %s", e)
@@ -516,7 +529,7 @@ def _mostrar_dia(query, spot_key: str, fecha: date):
             _safe_edit(query, "⚠️ Error al obtener el pronóstico.")
 
 
-def _mostrar_ventanas(query, spot_key: str, spot):
+def _mostrar_ventanas(query, spot_key: str, spot, desde_favoritos: bool = False):
     """Próximas olas — vista 48h hora a hora con horas buenas destacadas."""
     try:
         _safe_edit(query, "⏳ Calculando próximas olas...")
@@ -526,14 +539,14 @@ def _mostrar_ventanas(query, spot_key: str, spot):
         _safe_edit(query,
             texto,
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=kb_post_forecast(spot_key),
+            reply_markup=kb_post_forecast(spot_key, desde_favoritos=desde_favoritos),
         )
     except Exception as e:
         logger.exception("Error en _mostrar_ventanas: %s", e)
         _safe_edit(query, formato_no_disponible(spot, str(e)))
 
 
-def _mostrar_horaria(query, spot_key: str, spot, fecha: date):
+def _mostrar_horaria(query, spot_key: str, spot, fecha: date, desde_favoritos: bool = False):
     """Vista hora a hora para el día indicado."""
     try:
         _safe_edit(query, "⏳ Generando vista hora a hora...")
@@ -541,24 +554,24 @@ def _mostrar_horaria(query, spot_key: str, spot, fecha: date):
         view = generar_vista_horaria(forecast, spot, fecha, incluir_noche=True)
 
         if view is None:
-            _safe_edit(query, 
+            _safe_edit(query,
                 f"⚠️ No hay datos para {fecha.strftime('%d/%m')}.",
-                reply_markup=kb_post_forecast(spot_key),
+                reply_markup=kb_post_forecast(spot_key, desde_favoritos=desde_favoritos),
             )
             return
 
         texto = formato_vista_horaria(view, spot)
-        _safe_edit(query, 
+        _safe_edit(query,
             texto,
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=kb_post_forecast(spot_key),
+            reply_markup=kb_post_forecast(spot_key, desde_favoritos=desde_favoritos),
         )
     except Exception as e:
         logger.exception("Error en _mostrar_horaria: %s", e)
         _safe_edit(query, formato_no_disponible(spot, str(e)))
 
 
-def _mostrar_semana(query, spot_key: str, spot):
+def _mostrar_semana(query, spot_key: str, spot, desde_favoritos: bool = False):
     """Ranking de los próximos 7 días."""
     try:
         _safe_edit(query, "⏳ Analizando la semana...")
@@ -566,24 +579,24 @@ def _mostrar_semana(query, spot_key: str, spot):
         analysis = analizar_semana(forecast, spot)
 
         if analysis is None:
-            _safe_edit(query, 
+            _safe_edit(query,
                 "⚠️ No hay suficientes datos para el análisis semanal.",
-                reply_markup=kb_post_forecast(spot_key),
+                reply_markup=kb_post_forecast(spot_key, desde_favoritos=desde_favoritos),
             )
             return
 
         texto = formato_semana(analysis, spot)
-        _safe_edit(query, 
+        _safe_edit(query,
             texto,
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=kb_post_forecast(spot_key),
+            reply_markup=kb_post_forecast(spot_key, desde_favoritos=desde_favoritos),
         )
     except Exception as e:
         logger.exception("Error en _mostrar_semana: %s", e)
         _safe_edit(query, formato_no_disponible(spot, str(e)))
 
 
-def _mostrar_breakdown(query, spot_key: str, spot):
+def _mostrar_breakdown(query, spot_key: str, spot, desde_favoritos: bool = False):
     """Breakdown técnico de sub-scores."""
     try:
         forecast = _get_forecast_cached(spot_key)
@@ -593,10 +606,10 @@ def _mostrar_breakdown(query, spot_key: str, spot):
             return
         from bot.formatters import formato_breakdown_pro
         texto = formato_breakdown_pro(hour, breakdown, spot)
-        _safe_edit(query, 
+        _safe_edit(query,
             texto,
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=kb_post_forecast(spot_key),
+            reply_markup=kb_post_forecast(spot_key, desde_favoritos=desde_favoritos),
         )
     except Exception as e:
         logger.exception("Error en _mostrar_breakdown: %s", e)
@@ -608,7 +621,9 @@ def _mostrar_breakdown(query, spot_key: str, spot):
 # ------------------------------------------------------------------
 
 def _cb_back(query, user_id: int, destino: str):
-    if destino == "paises":
+    if destino == "favoritos":
+        _mostrar_favoritos(query, user_id)
+    elif destino == "paises":
         session_store.update_session(user_id, step="seleccion_pais")
         paises = listar_paises()
         favs = _resolver_nombres_favoritos(session_store.get_favoritos(user_id))
@@ -641,37 +656,62 @@ def _cb_back(query, user_id: int, destino: str):
             _safe_edit(query, "¿Dónde vas a surfear? 🏄‍♂️🌍",
                 reply_markup=kb_seleccion_pais(paises, favoritos=favs))
     elif destino.startswith("spot:"):
-        spot_key = destino.split(":", 1)[1]
-        _cb_spot(query, user_id, spot_key)
+        # back:spot:<spot_key>:<origen>
+        parts = destino.split(":")
+        spot_key = parts[1]
+        desde_favoritos = len(parts) > 2 and parts[2] == "fav"
+        _cb_spot(query, user_id, spot_key, desde_favoritos=desde_favoritos)
+
+
+def _mostrar_favoritos(query, user_id: int):
+    """Pantalla dedicada 'Mis favoritos' — destino de Volver para spots
+    abiertos desde el contexto de favoritos (#B1)."""
+    favs = _resolver_nombres_favoritos(session_store.get_favoritos(user_id))
+    if not favs:
+        paises = listar_paises()
+        _safe_edit(query,
+            "No tenés spots favoritos todavía. Explorá y agregá alguno con ⭐ desde el menú de un spot.",
+            reply_markup=kb_seleccion_pais(paises, favoritos=[]),
+        )
+        return
+    _safe_edit(query,
+        "⭐ *Mis favoritos*",
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=kb_favoritos(favs),
+    )
 
 
 # ------------------------------------------------------------------
 # Favoritos
 # ------------------------------------------------------------------
 
-def _cb_fav_add(query, user_id: int, spot_key: str):
+def _cb_fav_add(query, user_id: int, spot_key: str, desde_favoritos: bool = False):
     session_store.add_favorito(user_id, spot_key)
     query.answer("⭐ Agregado a favoritos")
     try:
-        session = session_store.get_session(user_id)
-        pais_key = session.get("pais", "") if session else ""
-        region_key = session.get("region", "") if session else ""
+        spot = get_spot(spot_key)
         query.message.edit_reply_markup(
-            kb_menu_spot(spot_key, es_favorito=True, pais_key=pais_key, region_key=region_key)
+            kb_menu_spot(
+                spot_key, es_favorito=True,
+                pais_key=spot.pais.lower(), region_key=spot.region,
+                desde_favoritos=desde_favoritos,
+            )
         )
     except Exception:
         pass
 
 
-def _cb_fav_del(query, user_id: int, spot_key: str):
+def _cb_fav_del(query, user_id: int, spot_key: str, desde_favoritos: bool = False):
     session_store.remove_favorito(user_id, spot_key)
     query.answer("💔 Quitado de favoritos")
     try:
-        session = session_store.get_session(user_id)
-        pais_key = session.get("pais", "") if session else ""
-        region_key = session.get("region", "") if session else ""
+        spot = get_spot(spot_key)
         query.message.edit_reply_markup(
-            kb_menu_spot(spot_key, es_favorito=False, pais_key=pais_key, region_key=region_key)
+            kb_menu_spot(
+                spot_key, es_favorito=False,
+                pais_key=spot.pais.lower(), region_key=spot.region,
+                desde_favoritos=desde_favoritos,
+            )
         )
     except Exception:
         pass

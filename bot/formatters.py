@@ -17,6 +17,7 @@ from typing import List, Optional
 from zoneinfo import ZoneInfo
 
 from core.scoring.models import ForecastHour, ScoreBreakdown, SpotConfig, VentanaOptima
+from core.scoring.engine import ajustar_swell
 from core.analysis.daylight import DaylightInfo
 from core.analysis.tides import TideAnalysis, TideEvent
 from core.analysis.best_hour import BestHourResult
@@ -119,7 +120,12 @@ def formato_condiciones_actuales(
     lineas.append("")
     lineas.append(SEPARADOR)
 
-    s = hour.swell
+    # Ajustado (delta_altura/factor_periodo), no crudo — los mismos valores
+    # que calcular_score() usó para puntuar. Antes se leía hour.swell
+    # directo: un spot con factor_periodo=1.1 podía mostrar "13s" mientras
+    # el score puntuó 14.3s como groundswell, contradiciendo el score
+    # mostrado arriba (mismo patrón que #28, ya arreglado en el detector).
+    s = ajustar_swell(hour.swell, spot)
     w = hour.wind
     t = hour.tide
     lineas.append(f"🌊 `{s.altura_m:.1f}m · {s.periodo_s:.0f}s · {_dir_a_texto(s.direccion_deg)}`      💨 `{w.velocidad_kmh:.0f} km/h {_dir_a_texto(w.direccion_deg)}`")
@@ -325,10 +331,11 @@ def formato_mejor_hora(
     h = result.hour
     hora_local = _ts_local(h.timestamp, spot)
     estrellas = _estrellas(result.breakdown.score_total)
+    s = ajustar_swell(h.swell, spot)  # ver nota en formato_condiciones_actuales()
 
     lineas.append(f"{estrellas} *{hora_local} hs*  _({result.score_100}/100 · {result.breakdown.etiqueta})_")
     lineas.append(
-        f"🌊 `{h.swell.altura_m:.1f}m · {h.swell.periodo_s:.0f}s · {_dir_a_texto(h.swell.direccion_deg)}`"
+        f"🌊 `{s.altura_m:.1f}m · {s.periodo_s:.0f}s · {_dir_a_texto(s.direccion_deg)}`"
         f"  💨 `{h.wind.velocidad_kmh:.0f} km/h {_dir_a_texto(h.wind.direccion_deg)}`"
     )
 
@@ -368,7 +375,8 @@ def formato_vista_horaria(
     for fila in view.filas:
         hora_str = fila.hour.timestamp.astimezone(tz).strftime("%H:%M")
         score_str = f"{fila.breakdown.score_100:3d}"
-        swell_str = f"{fila.hour.swell.altura_m:.1f}m/{fila.hour.swell.periodo_s:.0f}s"
+        s_ajustado = ajustar_swell(fila.hour.swell, spot)  # ver nota en formato_condiciones_actuales()
+        swell_str = f"{s_ajustado.altura_m:.1f}m/{s_ajustado.periodo_s:.0f}s"
         viento_str = f"{fila.hour.wind.velocidad_kmh:.0f}km/h {_dir_a_texto(fila.hour.wind.direccion_deg)}"
 
         if fila.es_mejor:
@@ -516,7 +524,8 @@ def formato_dia_completo(
     lineas.append("")
     lineas.append(SEPARADOR)
 
-    s = h_display.swell
+    # Ajustado, no crudo — ver nota equivalente en formato_condiciones_actuales().
+    s = ajustar_swell(h_display.swell, spot)
     w = h_display.wind
     t = h_display.tide
     lineas.append(f"🌊 `{s.altura_m:.1f}m · {s.periodo_s:.0f}s · {_dir_a_texto(s.direccion_deg)}`      💨 `{w.velocidad_kmh:.0f} km/h {_dir_a_texto(w.direccion_deg)}`")
@@ -639,7 +648,8 @@ def formato_proximas_olas(
             (h for h in forecast if h.timestamp == v.hora_pico), None
         )
         if hora_pico:
-            swell_str = f"{hora_pico.swell.altura_m:.1f}m / {hora_pico.swell.periodo_s:.0f}s"
+            s_ajustado = ajustar_swell(hora_pico.swell, spot)  # ver nota en formato_condiciones_actuales()
+            swell_str = f"{s_ajustado.altura_m:.1f}m / {s_ajustado.periodo_s:.0f}s"
             viento_str = f"{hora_pico.wind.velocidad_kmh:.0f} km/h {_dir_a_texto(hora_pico.wind.direccion_deg)}"
             lineas.append(f"🌊 Swell: {swell_str}")
             lineas.append(f"💨 Viento: {viento_str}")

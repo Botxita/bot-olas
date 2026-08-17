@@ -549,6 +549,69 @@ def test_proximas_olas_umbral_compara_score_total_no_score_100_redondeado():
 
 
 # ---------------------------------------------------------------------------
+# Swell ajustado (delta_altura/factor_periodo), no crudo -- mismo patrón
+# que la regresión #28 ya arreglada en core/windows/detector.py, ahora
+# extendida a los 5 lugares de bot/formatters.py que mostraban hour.swell
+# directo en vez de los valores que calcular_score() usó para puntuar.
+# ---------------------------------------------------------------------------
+
+def _spot_con_ajustes():
+    spot = make_spot()
+    spot.delta_altura = 0.3
+    spot.factor_periodo = 1.1
+    return spot
+
+
+def test_condiciones_actuales_usa_swell_ajustado_no_crudo():
+    spot = _spot_con_ajustes()
+    s = formato_condiciones_actuales(make_hour(), make_breakdown(), spot)
+    # Bloque de swell puntualmente, no "12s" en todo el mensaje -- el flag
+    # "Groundswell largo (12s)" es texto fijo del fixture make_breakdown(),
+    # independiente del swell real pasado al formatter.
+    assert "1.8m · 13s" in s
+    assert "1.5m · 12s" not in s
+
+
+def test_dia_completo_usa_swell_ajustado_no_crudo():
+    spot = _spot_con_ajustes()
+    s = formato_dia_completo(
+        make_hour(), make_breakdown(), spot,
+        make_daylight(), None, None, es_hoy=True,
+    )
+    assert "1.8m · 13s" in s
+    assert "1.5m · 12s" not in s
+
+
+def test_mejor_hora_usa_swell_ajustado_no_crudo():
+    spot = _spot_con_ajustes()
+    s = formato_mejor_hora(make_best_hour_result(), spot)
+    assert "1.8m · 13s" in s
+    assert "1.5m · 12s" not in s
+
+
+def test_vista_horaria_usa_swell_ajustado_no_crudo():
+    spot = _spot_con_ajustes()
+    s = formato_vista_horaria(make_hourly_view(), spot)
+    assert "1.8m/13s" in s
+    assert "1.5m/12s" not in s
+
+
+def test_proximas_olas_usa_swell_ajustado_no_crudo():
+    spot = _spot_con_ajustes()
+    pico_ts = datetime(2025, 1, 15, 13, 0, tzinfo=timezone.utc)
+    hour = make_hour(ts=pico_ts)
+    v = VentanaOptima(
+        inicio=datetime(2025, 1, 15, 12, 0, tzinfo=timezone.utc),
+        fin=datetime(2025, 1, 15, 15, 0, tzinfo=timezone.utc),
+        score_promedio=0.72, score_max=0.80,
+        hora_pico=pico_ts, descripcion="Offshore", horas_count=3,
+    )
+    s = formato_proximas_olas([hour], [v], spot)
+    assert "1.8m / 13s" in s
+    assert "1.5m / 12s" not in s
+
+
+# ---------------------------------------------------------------------------
 # Ejecutar directamente
 # ---------------------------------------------------------------------------
 

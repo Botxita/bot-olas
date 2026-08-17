@@ -218,6 +218,33 @@ def test_condiciones_proxy_msl_label():
     assert "proxy MSL" in s or "estimada" in s
 
 
+def test_condiciones_calidad_antes_que_datos_crudos():
+    """El score debe aparecer antes de los datos de swell/viento (#A1: lo
+    que decide si vale la pena seguir leyendo va primero)."""
+    s = formato_condiciones_actuales(make_hour(), make_breakdown(0.75), SPOT)
+    assert s.index("75/100") < s.index("1.5m")
+
+
+def test_condiciones_flags_positivos_en_una_sola_linea():
+    """Varios flags positivos van condensados en una sola línea con ✅,
+    no uno por línea (#A1)."""
+    bd = ScoreBreakdown(
+        score_energia=0.8, score_periodo=0.8, score_dir_swell=0.8,
+        score_viento=0.8, score_marea=0.8, score_total=0.8, energia_proxy=20.0,
+        flags_positivos=["Groundswell largo (14s)", "Offshore limpio (10 km/h)", "Marea óptima"],
+    )
+    s = formato_condiciones_actuales(make_hour(), bd, SPOT)
+    assert s.count("✅") == 1
+    assert "Groundswell largo (14s) · Offshore limpio (10 km/h) · Marea óptima" in s
+
+
+def test_condiciones_proxy_msl_una_sola_vez():
+    """El disclaimer de proxy MSL no debe duplicarse entre el flag neutro
+    (suprimido) y la línea de marea inline, que ya lo muestra (#A1)."""
+    s = formato_condiciones_actuales(make_hour(), make_breakdown(), SPOT)
+    assert s.count("proxy MSL") == 1
+
+
 def test_condiciones_hora_local_ar():
     """La hora mostrada debe ser la local del spot (AR = UTC-3)."""
     # TS_BASE = 14:00 UTC → 11:00 AR

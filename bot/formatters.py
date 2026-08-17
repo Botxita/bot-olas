@@ -98,14 +98,31 @@ def formato_condiciones_actuales(
     hora = _ts_local(hour.timestamp, spot)
     lineas.append(f"📅 {dia} · {hora} hs")
     lineas.append("")
+
+    # CALIDAD primero: lo que decide si vale la pena seguir leyendo.
+    lineas.append(f"{_estrellas(breakdown.score_total)} *{breakdown.score_100}/100 · {breakdown.etiqueta}*")
+
+    # Flags condensados en una línea por categoría en vez de una línea por
+    # flag — el "proxy MSL" neutro se omite acá porque _formato_marea_inline()
+    # ya lo muestra siempre, más abajo.
+    if breakdown.flags_positivos:
+        lineas.append(f"✅ {' · '.join(breakdown.flags_positivos)}")
+    if breakdown.flags_negativos:
+        lineas.append(f"❌ {' · '.join(breakdown.flags_negativos)}")
+    neutros_sin_proxy = [
+        f for f in breakdown.flags_neutros
+        if "proxy MSL" not in f and "proxy_msl" not in f.lower()
+    ]
+    if neutros_sin_proxy:
+        lineas.append(f"ℹ️ {' · '.join(neutros_sin_proxy)}")
+
+    lineas.append("")
     lineas.append(SEPARADOR)
 
-    lineas.append("*CONDICIONES*")
     s = hour.swell
     w = hour.wind
     t = hour.tide
-    lineas.append(f"🌊  Swell:   `{s.altura_m:.1f}m · {s.periodo_s:.0f}s · {_dir_a_texto(s.direccion_deg)}`")
-    lineas.append(f"💨  Viento:  `{w.velocidad_kmh:.0f} km/h · {_dir_a_texto(w.direccion_deg)}`")
+    lineas.append(f"🌊 `{s.altura_m:.1f}m · {s.periodo_s:.0f}s · {_dir_a_texto(s.direccion_deg)}`      💨 `{w.velocidad_kmh:.0f} km/h {_dir_a_texto(w.direccion_deg)}`")
     if w.rafaga_kmh > w.velocidad_kmh * 1.3:
         lineas.append(f"       ↪ Ráfagas: `{w.rafaga_kmh:.0f} km/h`")
     if hour.temp_agua_c is not None:
@@ -121,19 +138,6 @@ def formato_condiciones_actuales(
             simbolo = "▲" if ev.tipo == "alta" else "▽"
             partes.append(f"{simbolo}{hora_ev}")
         lineas.append(f"       ↪ `{'  '.join(partes)}`")
-    lineas.append("")
-    lineas.append(SEPARADOR)
-
-    lineas.append("*CALIDAD*")
-    lineas.append(f"{_estrellas(breakdown.score_total)}  *({breakdown.score_100}/100) · {breakdown.etiqueta}*")
-    lineas.append("")
-
-    for f_pos in breakdown.flags_positivos:
-        lineas.append(f"✅ {f_pos}")
-    for f_neg in breakdown.flags_negativos:
-        lineas.append(f"❌ {f_neg}")
-    for f_neu in breakdown.flags_neutros:
-        lineas.append(f"ℹ️  {f_neu}")
 
     return "\n".join(lineas)
 
@@ -252,17 +256,22 @@ def formato_mareas(
     analysis: TideAnalysis,
     spot: SpotConfig,
     max_eventos: int = 4,
+    incluir_disclaimer: bool = True,
 ) -> str:
     """
     Sección de mareas para incluir en el mensaje del día.
 
     Muestra eventos alta/baja con horario local.
     Si no hay extremos claros, muestra solo la tendencia.
-    Siempre aclara que es marea estimada (proxy MSL).
+    Aclara que es marea estimada (proxy MSL) salvo que el caller ya lo
+    haya mostrado antes en el mismo mensaje (ver formato_dia_completo(),
+    que pasa incluir_disclaimer=False porque _formato_marea_inline() ya
+    lo mostró más arriba).
     """
     lineas = []
     lineas.append(SEPARADOR)
-    lineas.append("*MAREAS* _(estimadas, proxy MSL)_")
+    titulo = "*MAREAS* _(estimadas, proxy MSL)_" if incluir_disclaimer else "*MAREAS*"
+    lineas.append(titulo)
 
     tz = _tz(spot)
 
@@ -517,18 +526,19 @@ def formato_dia_completo(
     for f_neg in bd_display.flags_negativos:
         lineas.append(f"❌ {f_neg}")
     for f_neu in bd_display.flags_neutros:
-        # Si hay tide_analysis, el bloque MAREAS de más abajo ya aclara
-        # "estimadas, proxy MSL" en su encabezado — mostrar el flag acá
-        # también lo duplicaría. Sin tide_analysis, este flag es la única
-        # aparición del disclaimer.
+        # _formato_marea_inline() (más arriba, línea de marea) siempre
+        # muestra el disclaimer de proxy MSL — mostrarlo también acá lo
+        # duplicaría. Con tide_analysis, formato_mareas() se llama con
+        # incluir_disclaimer=False por la misma razón, así que no hay un
+        # tercer lugar donde vuelva a aparecer.
         es_proxy_msl = "proxy MSL" in f_neu or "proxy_msl" in f_neu.lower()
-        if not (tide_analysis is not None and es_proxy_msl):
+        if not es_proxy_msl:
             lineas.append(f"ℹ️  {f_neu}")
 
     # Mareas del día
     if tide_analysis:
         lineas.append("")
-        lineas.append(formato_mareas(tide_analysis, spot))
+        lineas.append(formato_mareas(tide_analysis, spot, incluir_disclaimer=False))
 
     # Si es hoy, mostrar mejor hora al final como bonus
     if es_hoy and mejor_hora is not None:
@@ -639,22 +649,27 @@ def _formato_marea_inline(tide_data, tide_analysis, spot: SpotConfig) -> str:
 
     Sin tide_analysis: muestra solo tendencia básica.
     Con tide_analysis: muestra tendencia + próximo evento (alta/baja).
+    Siempre incluye el disclaimer de proxy MSL inline (#A1) — tanto
+    formato_condiciones_actuales() como formato_dia_completo() la usan y
+    filtran el flag neutro equivalente para no duplicarlo.
 
     Ejemplos:
-      🌊  Marea:   subiendo ↑ · próxima alta ~14:30 hs
-      🌊  Marea:   bajando ↓  · próxima baja ~17:00 hs
-      🌊  Marea:   estable →
+      🌊  Marea:   `subiendo ↑` _(estimada, proxy MSL)_ · próxima alta ~14:30 hs
+      🌊  Marea:   `bajando ↓` _(estimada, proxy MSL)_ · próxima baja ~17:00 hs
+      🌊  Marea:   `estable →` _(estimada, proxy MSL)_
     """
     from core.analysis.tides import TideAnalysis
 
+    DISCLAIMER = "_(estimada, proxy MSL)_"
     flechas = {"subiendo": "↑", "bajando": "↓", "estable": "→"}
 
     if tide_analysis is None or not isinstance(tide_analysis, TideAnalysis):
         # Sin análisis — mostrar solo tendencia estimada por el nivel
-        return "🌊  Marea:   _sin datos de tendencia_"
+        return f"🌊  Marea:   _sin datos de tendencia_ {DISCLAIMER}"
 
     tendencia = tide_analysis.tendencia_actual
     flecha = flechas.get(tendencia, "")
+    base = f"🌊  Marea:   `{tendencia} {flecha}` {DISCLAIMER}"
     tz = _tz(spot)
 
     # Buscar el próximo evento coherente con la tendencia:
@@ -687,7 +702,7 @@ def _formato_marea_inline(tide_data, tide_analysis, spot: SpotConfig) -> str:
             tendencia == "estable"
         )
         if coherente:
-            return f"🌊  Marea:   `{tendencia} {flecha}` · próxima {tipo} ~{hora_evento} hs"
+            return f"{base} · próxima {tipo} ~{hora_evento} hs"
         else:
             # Buscar el siguiente evento coherente
             if tide_analysis.tiene_extremos_claros and tide_analysis.eventos:
@@ -697,13 +712,13 @@ def _formato_marea_inline(tide_data, tide_analysis, spot: SpotConfig) -> str:
                 coherentes = [e for e in tide_analysis.eventos if e.timestamp > ahora and e.tipo == tipo_buscado]
                 if coherentes:
                     hora_evento = coherentes[0].timestamp.astimezone(tz).strftime("%H:%M")
-                    return f"🌊  Marea:   `{tendencia} {flecha}` · próxima {tipo_buscado} ~{hora_evento} hs"
-            return f"🌊  Marea:   `{tendencia} {flecha}`"
+                    return f"{base} · próxima {tipo_buscado} ~{hora_evento} hs"
+            return base
     elif tide_analysis.proximo_cambio:
         hora_cambio = tide_analysis.proximo_cambio.astimezone(tz).strftime("%H:%M")
-        return f"🌊  Marea:   `{tendencia} {flecha}` · cambia ~{hora_cambio} hs"
+        return f"{base} · cambia ~{hora_cambio} hs"
     else:
-        return f"🌊  Marea:   `{tendencia} {flecha}`"
+        return base
 
 
 def _etiqueta(score_100: int) -> str:

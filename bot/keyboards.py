@@ -41,6 +41,8 @@ PAISES_FLAGS = {
     "pe": "🇵🇪",
     "cr": "🇨🇷",
     "uy": "🇺🇾",
+    "pa": "🇵🇦",
+    "sv": "🇸🇻",
 }
 
 
@@ -168,9 +170,12 @@ def kb_menu_spot(
             InlineKeyboardButton("📅 Esta semana",  callback_data=f"action:semana:{spot_key}:{origen}"),
             InlineKeyboardButton("🔬 Breakdown",    callback_data=f"action:breakdown:{spot_key}:{origen}"),
         ],
-        # Fila 4: favorito + navegación
+        # Fila 4: favorito (sola, no compite en peso visual con Volver — #A1)
         [
             InlineKeyboardButton(fav_label,         callback_data=fav_data),
+        ],
+        # Fila 5: navegación
+        [
             InlineKeyboardButton("⬅️ Volver",        callback_data=volver_data),
         ],
     ]

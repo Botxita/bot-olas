@@ -2,19 +2,19 @@
 
 Documento vivo de auditoría de fondo sobre `core/` (scoring, analysis, windows) y, desde el hallazgo #32, sobre **calidad de datos geográficos** de `config/spots/*.json`. Generado a partir de una revisión conjunta Claude Code + Codex (auditor independiente, ver `AGENTS.md`).
 
-**Estado (actualizado tras 3 rondas de fixes de código + 1 ronda de auditoría de datos + 2 rondas de fixes de datos + los subgrupos scoring y Analysis del Grupo 4):** de los **55 hallazgos documentados** (31 de código + 24 de datos geográficos), **42 fueron corregidos** — 25 de código (13 en 3 grupos priorizados por Ivan + 4 del subgrupo scoring del Grupo 4: #2, #6, #7, #8 + 8 del subgrupo Analysis del Grupo 4: #14-#21), más 17 de datos geográficos:
+**Estado (actualizado tras 3 rondas de fixes de código + 1 ronda de auditoría de datos + 2 rondas de fixes de datos + los subgrupos scoring, Analysis y Windows del Grupo 4):** de los **55 hallazgos documentados** (31 de código + 24 de datos geográficos), **47 fueron corregidos** — 30 de código (13 en 3 grupos priorizados por Ivan + 4 del subgrupo scoring del Grupo 4: #2, #6, #7, #8 + 8 del subgrupo Analysis del Grupo 4: #14-#21 + 5 del subgrupo Windows del Grupo 4: #25-#29), más 17 de datos geográficos:
 - **10 verificados por Ivan en Google Maps** (la fuente más confiable): #33, #34, #41, #43, #44, #46, #47, #48, #49, #53.
 - **7 del "grupo confiable"** aplicados a partir de estimaciones de Codex (punto medio de rango sugerido, o coordenada estimada), **sin verificación cartográfica** de Ivan: #32, #37, #38, #39, #40, #50, #51 — tratar con más cautela que los 10 anteriores.
 
 **Los 24 hallazgos geográficos quedan 100% cerrados** (con acción tomada o verificación explícita en cada uno): 17 corregidos (ver arriba) + 6 verificados sin cambios necesarios en sus coordenadas (#36, #35, #42, #45, #52, #55 — de estos, #35/#52/#55 tienen una sospecha de `orientacion_costa_deg` que la verificación de coordenadas NO abordó, sigue marcada `⚠️` en cada uno por separado) + 1 con evidencia insuficiente para decidir (#54, `🔍 VERIFICADO — EVIDENCIA INSUFICIENTE`).
 
-**Grupo 4 (hallazgos sin priorizar en la ronda original, sin tag de grupo — cada uno con su propio commit):** subgrupo scoring **#2, #6, #7, #8 ✅ RESUELTO** y subgrupo analysis **#14-#21 ✅ RESUELTO** — ambos subgrupos completos, ver detalle en cada hallazgo abajo. Quedan abiertos, sin tocar: subgrupo windows #25-#29, y #31 (registry+persistencia).
+**Grupo 4 (hallazgos sin priorizar en la ronda original, sin tag de grupo — cada uno con su propio commit):** subgrupo scoring **#2, #6, #7, #8 ✅ RESUELTO**, subgrupo analysis **#14-#21 ✅ RESUELTO** y subgrupo windows **#25-#29 ✅ RESUELTO** — los tres subgrupos completos, ver detalle en cada hallazgo abajo. Queda abierto, sin tocar: #31 (registry+persistencia).
 
 - **Grupo 1** (`fix-grupo1-scoring-critico`): #5, #12, #22.
 - **Grupo 2** (`fix-grupo2-analisis-y-detector`): #1, #3, #4, #11, #23, #24.
 - **Grupo 3** (`fix-grupo3-riesgos-configuracion`): #9, #10, #13, #30.
 
-Cada fix pasó por revisión obligatoria de Codex antes de commitear (ver `AGENTS.md`) y sumó tests de regresión — el test suite completo sigue en 252 passed / 15 failed (los 15 son fixtures de fecha fija preexistentes, no relacionados a este documento).
+Cada fix pasó por revisión obligatoria de Codex antes de commitear (ver `AGENTS.md`) y sumó tests de regresión — el test suite completo sigue en 259 passed / 15 failed (los 15 son fixtures de fecha fija preexistentes, no relacionados a este documento).
 
 Formato por hallazgo (#1-#31, código): módulo, severidad, líneas, descripción, escenario concreto, por qué el test suite no lo agarra. Formato por hallazgo (#32-#55, datos geográficos): spot afectado, qué está mal, estimación de corrección — ver la sección propia para su escala de severidad, distinta a la de código.
 
@@ -244,11 +244,15 @@ Auditado en dos pasadas contra `tests/test_scoring.py` (los 4 tests que ejercita
 
 ### 25. Agrupamiento de ventanas por adyacencia en la lista, sin verificar continuidad horaria real — **media**
 
+**✅ RESUELTO** — commit `4f76fb4` (`fix(#25): cortar ventanas por hueco de datos ademas de cambio de dia`). Corta por hueco real (`timestamp - último != 1h`) O por cambio de día local — ambas reglas independientes, ninguna reemplaza a la otra.
+
 - Código: [detector.py:93-108](core/windows/detector.py#L93). El corte de ventana solo chequea cambio de día local (fix histórico ya documentado en CLAUDE.md), no que los timestamps consecutivos estén separados exactamente 1h.
 - Ejemplo: si faltan datos de las 09:00 (gap del provider, o descartada por el hallazgo #23), las horas 08:00 y 10:00 —ambas sobre el umbral— quedan adyacentes en la lista `scored` y se fusionan en una sola ventana continua, aunque haya un hueco de una hora sin datos en el medio.
 - **Cobertura:** no cubierta. El fixture sí tiene huecos horarios (06:00, 07:00, 08:00, 09:00, 10:00, 14:00, 18:00 UTC), pero las horas después del primer bloque tienen condiciones malas, así que ningún test ejercita dos horas buenas separadas por un hueco.
 
 ### 26. Ventanas de una sola hora se generan pese al contrato de "mínimo 2h" — **media**
+
+**✅ RESUELTO** — commit `89a7716` (`fix(#26): descartar ventanas de una sola hora vigente`). Filtro `len(group_vigente) < 2` aplicado después del recorte de horas ya pasadas (#24).
 
 - El agrupamiento acepta grupos de tamaño 1 ([detector.py:93-108](core/windows/detector.py#L93)) y `_construir_ventana()` no valida tamaño mínimo ([detector.py:126-137](core/windows/detector.py#L126)). El flujo de "condiciones actuales" en `bot/handlers/main.py:410` documenta explícitamente "ventana más cercana (mínimo 2h)" como expectativa.
 - Ejemplo: 09:00=0.40, 10:00=0.61, 11:00=0.40 → se genera una ventana 10:00–11:00 con `horas_count=1`.
@@ -256,17 +260,23 @@ Auditado en dos pasadas contra `tests/test_scoring.py` (los 4 tests que ejercita
 
 ### 27. La descripción puede etiquetar como "offshore" un viento que no lo es — **media**
 
+**✅ RESUELTO** — commit `9e1e942` (`fix(#27): no etiquetar como offshore un viento calmo sin esa direccion`). Usa `_tipo_viento()` para confirmar la dirección real antes de decir "offshore"; si el score es alto pero no es offshore, se etiqueta "viento calmo".
+
 - Código: [detector.py:198-204](core/windows/detector.py#L198). El highlight de viento se infiere solo de `score_viento >= 0.85`, pero en el engine cualquier viento < 5 km/h da `score_viento=1.0` sin importar la dirección (ver `_score_viento`, engine.py:153-154).
 - Ejemplo: viento onshore de 3 km/h → `score_viento=1.0` → la ventana se describe como "offshore", una afirmación de dirección meteorológica falsa, no solo una valoración subjetiva optimista.
 - **Cobertura:** no cubierta. El test de descripción solo verifica que el texto tenga más de 5 caracteres, no su contenido.
 
 ### 28. La descripción de la ventana muestra valores crudos, no los ajustados por `delta_altura`/`factor_periodo` que sí usa el score — **media**
 
+**✅ RESUELTO** — commit `1a53c0f` (`fix(#28): descripcion de ventana usa swell ajustado, no crudo`). Nueva función pública `ajustar_swell()` en `engine.py`, reutilizada por `calcular_score()` y por el detector — evita duplicar la lógica de ajuste en dos lugares.
+
 - Altura mostrada: [detector.py:213-215](core/windows/detector.py#L213). Período mostrado: [detector.py:206-211](core/windows/detector.py#L206). El engine sí aplica `factor_periodo`/`delta_altura` para calcular el score ([engine.py:310-316](core/scoring/engine.py#L310)), pero el detector lee los valores crudos de `ForecastHour` para el texto.
 - Ejemplo: altura cruda 0.7m con `delta_altura=+0.3` — el score usa 1.0m, pero la descripción muestra "0.7m". Período crudo 13s con `factor_periodo=1.1` — el score usa 14.3s (puede calificar como groundswell), pero la descripción muestra "13s" y no agrega el highlight "groundswell". Hay 4 spots reales con `factor_periodo != 1`, así que esto es disparable hoy.
 - **Cobertura:** no cubierta. El spot de test usa ajustes neutros (`delta_altura=0`, `factor_periodo=1`).
 
 ### 29. Fail-safe de daylight captura cualquier excepción, no solo la de fenómeno polar — **baja hoy**
+
+**✅ RESUELTO** — commit `078a645` (`fix(#29): fail-safe de daylight solo captura el fenomeno polar`). Nueva excepción específica `PolarDaylightError(ValueError)` en `daylight.py`, usada solo para el fenómeno polar real; el detector captura solo ese tipo (angostar a `ValueError` genérico no alcanzaba — Codex lo marcó bloqueante en primera ronda).
 
 - Código: [detector.py:62-72](core/windows/detector.py#L62). `except Exception` (no `except ValueError`) incluye la hora igual, fail-open, ante cualquier error calculando luz solar — no solo ante el caso polar documentado.
 - Esto puede esconder errores no relacionados (ej. un bug futuro en `daylight.py` o un `SpotConfig` con lat/lon corruptos) tratándolos silenciosamente como "incluir la hora igual", incluyendo potencialmente horas nocturnas en las recomendaciones.
@@ -504,4 +514,4 @@ Esta lista refleja la priorización sugerida en la auditoría original, antes de
 
 **Crash confirmado (no solo silencioso)**: ranking con solo horas nocturnas + `incluir_noche=True` (#12) — ✅ resuelto, `ddc69e6`.
 
-**Sin priorizar en la ronda original — subgrupos scoring (#2, #6, #7, #8) y analysis (#14-#21) ✅ RESUELTO, ver detalle en cada hallazgo arriba.** Todavía abiertos: #25, #26, #27, #28, #29 (subgrupo windows), y #31 (registry+persistencia, hallado después, durante la revisión del fix #13).
+**Sin priorizar en la ronda original — subgrupos scoring (#2, #6, #7, #8), analysis (#14-#21) y windows (#25-#29) ✅ RESUELTO, ver detalle en cada hallazgo arriba.** Todavía abierto: #31 (registry+persistencia, hallado después, durante la revisión del fix #13).

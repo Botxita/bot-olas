@@ -70,7 +70,12 @@ class WeeklyAnalysis:
         candidatos = [d.mejor_hora for d in self.scores_por_dia if d.mejor_hora is not None]
         if not candidatos:
             return None
-        return max(candidatos, key=lambda r: r.score_100)
+        # score_total (float), no score_100 (entero redondeado) — con
+        # score_100 dos días distintos pueden empatar en el redondeo
+        # (ej. 0.8041 y 0.8049 ambos redondean a 80) y max() se queda con
+        # el primero en orden cronológico en vez del que tiene el score
+        # real más alto (#20).
+        return max(candidatos, key=lambda r: r.breakdown.score_total)
 
 
 def analizar_semana(

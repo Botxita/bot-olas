@@ -319,6 +319,37 @@ def test_weekly_dias_buenos_threshold():
         assert d.score_100 >= 55, f"Día {d.fecha} en dias_buenos pero score={d.score_100}"
 
 
+def test_weekly_mejor_ventana_semana_desempate_usa_score_real():
+    """
+    Regresión #20: mejor_ventana_semana() usaba score_100 (int redondeado)
+    para elegir el máximo, en vez de score_total (float) — dos días con
+    scores reales distintos que redondean al mismo entero (0.8041 y 0.8049,
+    ambos -> 80) empataban en max() y ganaba el primero cronológicamente
+    (día 1), no el que realmente tiene el score más alto (día 2).
+    """
+    tz = ZoneInfo("America/Argentina/Buenos_Aires")
+    ahora = datetime(FECHA.year, FECHA.month, FECHA.day, 0, 0, tzinfo=tz).astimezone(timezone.utc)
+
+    fecha_dia2 = FECHA + timedelta(days=1)
+    forecast = make_forecast_dias(FECHA, 2)  # 2 días, scores default 0.5
+    scores = scores_dict(forecast)
+
+    hora_pico_dia1 = datetime(FECHA.year, FECHA.month, FECHA.day, 12, 0, tzinfo=tz).astimezone(timezone.utc)
+    hora_pico_dia2 = datetime(fecha_dia2.year, fecha_dia2.month, fecha_dia2.day, 12, 0, tzinfo=tz).astimezone(timezone.utc)
+    scores[hora_pico_dia1] = 0.8041  # día 1 -> score_100 = 80
+    scores[hora_pico_dia2] = 0.8049  # día 2 -> score_100 = 80 también, pero score_total real más alto
+
+    sf = mock_score_fn(scores)
+    result = analizar_semana(forecast, SPOT, score_fn=sf, ahora=ahora)
+    assert result is not None
+
+    ventana = result.mejor_ventana_semana
+    assert ventana is not None
+    assert ventana.score_100 == 80, "sanity check: ambos días deben empatar en el score redondeado"
+    assert ventana.hour.timestamp == hora_pico_dia2, \
+        "debe elegir el día con score_total real más alto, no el primero cronológicamente"
+
+
 def test_weekly_mejor_ventana_semana():
     """mejor_ventana_semana debe ser BestHourResult con el score más alto de la semana."""
     forecast = make_forecast_dias(FECHA, 3)

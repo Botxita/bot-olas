@@ -1,2 +1,0 @@
-cd C:\Users\tacki\Desktop\PyLinac\Olas\olas_surfer_bot_v2
-.\.venv\Scripts\activate

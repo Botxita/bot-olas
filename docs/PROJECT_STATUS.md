@@ -53,7 +53,7 @@ tests/ (7 archivos, 169 tests — 154 pasan, 15 fallan)
 4. ~~Confirmar si Flask en `requirements.txt` está realmente usado en algún lado o es deuda muerta.~~ Resuelto: era deuda muerta, eliminado.
 5. Onboarding de nivel de surfista (principiante/intermedio/avanzado) para ajustar umbrales de "bueno/regular/malo" — pedido original de Ivan, no implementado.
 6. Resolución horaria de marea con minutos exactos — limitación de datos de Open-Meteo, no bug de formato; evaluar si vale la pena un proveedor de mareas dedicado (Stormglass/WorldTides) a futuro.
-7. Borrar `power.txt` (archivo suelto con ruta local vieja, aparenta ser basura de un `cd`/`activate` pegado por error).
+7. ~~Borrar `power.txt` (archivo suelto con ruta local vieja, aparenta ser basura de un `cd`/`activate` pegado por error).~~ Resuelto: confirmado como basura, borrado.
 
 ## Decisiones de producto ya tomadas (no volver a discutir sin razón)
 

@@ -32,7 +32,7 @@ El score final (`score_total` / `score_100`) puede parecer razonable aunque alg�
 - Seguridad: resuelto en `cf0f5fe` (token rotado, `.env` destrackeado). Queda como riesgo residual aceptado que el token viejo (inválido) siga visible en commits previos a `cf0f5fe` — no se purga el historial porque el repo es privado.
 - Navegación "atrás" desde favoritos — resuelto (pantalla dedicada "Mis favoritos" + contexto de navegación viajando en callback_data en vez de sesión mutable).
 - Uso de Flask en `requirements.txt` — confirmado como deuda muerta (0 usos en el código; webhook y `/health` corren sobre Tornado vía PTB v13) y eliminado.
-- `power.txt` — archivo suelto con ruta local vieja, candidato a borrar (pendiente, C3).
+- `power.txt` — confirmado como `cd`/`activate` de PowerShell pegado por error, referenciaba una ruta local de otra máquina. Borrado.
 
 ## Qué no podés hacer vos ni Claude Code
 

@@ -17,7 +17,7 @@ import os
 from datetime import datetime, timezone, timedelta
 from typing import List
 
-from ..scoring.engine import calcular_score
+from ..scoring.engine import calcular_score, _tipo_viento
 from ..scoring.models import ForecastHour, ScoreBreakdown, SpotConfig, VentanaOptima
 from ..analysis.daylight import get_daylight_for_forecast_hour, is_daylight
 
@@ -277,9 +277,17 @@ def _generar_descripcion(
     # Highlights
     highlights = []
 
-    # Viento
+    # Viento — score_viento >= 0.85 no implica dirección offshore: el
+    # engine da score=1.0 a cualquier viento < 5 km/h sin importar su
+    # dirección (ver _score_viento, engine.py). Antes, esa condición sola
+    # bastaba para etiquetar la ventana como "offshore" — una afirmación de
+    # dirección meteorológica falsa para un viento simplemente calmo (#27).
+    tipo_viento = _tipo_viento(pico_hour.wind.direccion_deg, spot.orientacion_costa_deg)
     if pico_bd.score_viento >= 0.85:
-        highlights.append("offshore")
+        if tipo_viento == "offshore":
+            highlights.append("offshore")
+        else:
+            highlights.append("viento calmo")
     elif pico_bd.score_viento >= 0.65:
         highlights.append("viento ok")
     else:

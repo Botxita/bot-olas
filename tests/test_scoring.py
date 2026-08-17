@@ -879,6 +879,31 @@ class TestDetectorVentanas(unittest.TestCase):
             self.assertIsInstance(ventanas[0].descripcion, str)
             self.assertGreater(len(ventanas[0].descripcion), 5)
 
+    def test_descripcion_no_dice_offshore_con_viento_calmo_onshore(self):
+        """
+        Regresión #27: score_viento >= 0.85 no implica dirección offshore —
+        el engine da score=1.0 a cualquier viento < 5 km/h sin importar su
+        dirección (ver _score_viento). Antes, esa condición sola bastaba
+        para etiquetar la ventana como "offshore", una afirmación de
+        dirección meteorológica falsa para un viento simplemente calmo con
+        dirección onshore.
+        """
+        spot = make_spot()
+        ahora = datetime.now(timezone.utc)
+        base = (ahora + timedelta(days=1)).replace(hour=15, minute=0, second=0, microsecond=0)
+        # Viento calmo (3 km/h) con dirección onshore (95° == orientacion_costa
+        # del spot de test) -- score_viento=1.0 por ser calmo, no por offshore.
+        cond = dict(altura=1.4, periodo=14, dir_swell=95, vel_viento=3, dir_viento=95, nivel_marea=1.0)
+        forecast = [
+            make_hour(ts=base, **cond),
+            make_hour(ts=base + timedelta(hours=1), **cond),
+        ]
+
+        ventanas = detectar_ventanas(forecast, spot, umbral=0.60)
+        self.assertEqual(len(ventanas), 1, f"Esperaba 1 ventana: {ventanas}")
+        self.assertNotIn("offshore", ventanas[0].descripcion)
+        self.assertIn("viento calmo", ventanas[0].descripcion)
+
     def test_ventanas_ordenadas_por_score(self):
         spot = make_spot()
         forecast = load_fixture_forecast(spot)

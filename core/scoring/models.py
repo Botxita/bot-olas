@@ -124,6 +124,8 @@ _TZ_FALLBACK_POR_PAIS = {
     "CO": "America/Bogota",
     "UY": "America/Montevideo",
     "EC": "America/Guayaquil",
+    "SV": "America/El_Salvador",
+    "PA": "America/Panama",
 }
 
 

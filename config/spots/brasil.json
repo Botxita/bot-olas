@@ -180,6 +180,25 @@
         }
       }
     },
+    "bahia": {
+      "nombre": "Bahía",
+      "spots": {
+        "tiririca": {
+          "nombre": "Tiririca",
+          "ciudad": "Itacaré",
+          "lat": -14.2860711, "lon": -38.9854015,
+          "orientacion_costa_deg": 112, "tolerancia_swell_deg": 45,
+          "tipo_break": "beach", "fondo": "arena",
+          "marea": {"rango_optimo_min_m": 0.4, "rango_optimo_max_m": 1.8, "tipo_efecto": "mid_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.6, "altura_max_m": 2.5, "periodo_min_s": 8, "direcciones_ideales": [90, 112, 135]},
+          "viento": {"vel_max_offshore_kmh": 25, "vel_max_onshore_kmh": 15},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Playa principal de surf en Itacaré, olas rápidas y huecas sobre banco de arena, rocas en los extremos. Temporada abril-septiembre. Coordenadas OpenStreetMap; orientación derivada de swell ideal E/SE + offshore WNW (surf-forecast.com — una fuente contradictoria que citaba offshore E fue descartada por Ivan, probablemente describe Itacarezinho/Engenhoca, spots distintos del mismo corredor). tolerancia_swell_deg, altura, periodo_min_s, marea (rango numérico y tipo_efecto) y viento confirmados explícitamente por Ivan como reutilización del cluster de Rio Grande do Norte (Pipa/Praia do Madeiro/Baía Formosa, beach breaks brasileños de perfil climático similar ya calibrados) — sin verificación cartográfica adicional para ninguno de estos valores.",
+          "tz": "America/Bahia"
+        }
+      }
+    },
     "rio_grande_do_norte": {
       "nombre": "Rio Grande do Norte",
       "spots": {

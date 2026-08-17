@@ -147,6 +147,47 @@ def test_hourly_view_mejor_hora_tiene_mayor_score():
             assert mejor.breakdown.score_total >= f.breakdown.score_total
 
 
+def test_hourly_view_es_mejor_no_se_duplica_con_timestamp_repetido():
+    """
+    Regresión #21: generar_vista_horaria() marcaba es_mejor comparando
+    timestamps (r.hour.timestamp == mejor_rank1.hour.timestamp) en vez de
+    comparar por rank. Si el forecast trajera dos registros con el mismo
+    timestamp (duplicado de datos, ej. un bug de merge de proveedor), ambos
+    quedaban marcados es_mejor=True aunque tuvieran rank/score distintos.
+    """
+    scores_h = {8: 0.4, 10: 0.9, 14: 0.6}
+    forecast = make_forecast_dias(FECHA, 1, scores_por_hora=scores_h)
+    base_scores = scores_dict(forecast)
+
+    # Duplicado corrupto: mismo timestamp que la hora genuinamente mejor
+    # (10h), pero con datos distintos (marcador tide.nivel_m=0.1) y un
+    # score mucho más bajo — simula un bug de merge que trae dos registros
+    # para la misma hora.
+    tz = ZoneInfo("America/Argentina/Buenos_Aires")
+    ts_mejor = datetime(FECHA.year, FECHA.month, FECHA.day, 10, 0, tzinfo=tz).astimezone(timezone.utc)
+    duplicado = ForecastHour(
+        timestamp=ts_mejor,
+        swell=SwellData(altura_m=1.5, periodo_s=12.0, direccion_deg=95.0),
+        wind=WindData(velocidad_kmh=15.0, rafaga_kmh=20.0, direccion_deg=180.0),
+        tide=TideData(nivel_m=0.1, fuente="proxy_msl"),  # marcador del duplicado
+    )
+    forecast_con_duplicado = forecast + [duplicado]
+
+    def sf(hour, spot):
+        if hour.tide.nivel_m == 0.1:
+            return make_breakdown(0.2)  # duplicado corrupto: score bajo
+        return make_breakdown(base_scores.get(hour.timestamp, 0.5))
+
+    result = generar_vista_horaria(forecast_con_duplicado, SPOT, FECHA, score_fn=sf)
+    assert result is not None
+
+    mejores = [f for f in result.filas if f.es_mejor]
+    assert len(mejores) == 1, \
+        f"Esperada exactamente 1 fila con es_mejor=True incluso con timestamp duplicado, got {len(mejores)}"
+    assert mejores[0].breakdown.score_total == 0.9, \
+        "la fila es_mejor debe ser la de score real más alto (0.9), no el duplicado corrupto con el mismo timestamp"
+
+
 def test_hourly_view_con_noche_incluye_nocturnas():
     """Con incluir_noche=True debe haber filas con es_dia=False."""
     forecast = make_forecast_dias(FECHA, 1)

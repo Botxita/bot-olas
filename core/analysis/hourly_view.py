@@ -76,16 +76,17 @@ def generar_vista_horaria(
     except ValueError:
         return None
 
-    # Determinar la mejor hora (rank=1 entre las diurnas)
-    mejor_rank1 = next((r for r in ranked if r.rank == 1 and r.es_dia), None)
-
-    # Construir HourlyRow con flag es_mejor
+    # Construir HourlyRow con flag es_mejor — se compara por identidad de
+    # rank (rank==1 entre las diurnas), no por timestamp: si el forecast
+    # trajera dos registros con el mismo timestamp (duplicado de datos,
+    # ej. un bug de merge de proveedor), comparar por timestamp marcaría
+    # ambos es_mejor=True aunque tuvieran rank/score distintos (#21). rank
+    # ya es único por construcción — calcular_ranking_dia() lo asigna por
+    # índice de enumeración sobre la lista ordenada por score, así que
+    # nunca se repite ni siquiera en un empate exacto de score_total.
     filas: List[HourlyRow] = []
     for r in ranked:
-        es_mejor = (
-            mejor_rank1 is not None
-            and r.hour.timestamp == mejor_rank1.hour.timestamp
-        )
+        es_mejor = r.rank == 1 and r.es_dia
         filas.append(HourlyRow(
             hour=r.hour,
             breakdown=r.breakdown,

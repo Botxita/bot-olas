@@ -106,7 +106,14 @@ def get_daylight_for_forecast_hour(
     """
     tz = spot.get_zoneinfo()
     dt_local = dt.astimezone(tz)
-    cache_key = (spot.key, dt_local.date())
+    # La clave incluye lat/lon/tz, no solo spot.key — este caché vive toda
+    # la vida del proceso (default mutable de argumento), así que si dos
+    # spots comparten `key` por error de config, o un spot se corrige
+    # (lat/lon) sin reiniciar el proceso, spot.key solo ya no identifica de
+    # forma única las coordenadas usadas para calcular el amanecer/atardecer
+    # — se devolvía el DaylightInfo viejo cacheado con las coordenadas
+    # equivocadas (#19).
+    cache_key = (spot.key, spot.lat, spot.lon, spot.tz, dt_local.date())
     if cache_key not in _cache:
         _cache[cache_key] = get_daylight(spot, dt_local.date())
     return _cache[cache_key]

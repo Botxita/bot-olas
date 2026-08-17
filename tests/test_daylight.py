@@ -257,6 +257,39 @@ def test_forecast_hour_cache():
     assert len(cache) == 1
 
 
+def test_forecast_hour_cache_no_colisiona_entre_spots_con_misma_key():
+    """
+    Regresión #19: la clave del caché era solo (spot.key, fecha), sin
+    lat/lon/tz. Dos SpotConfig con la misma key pero coordenadas distintas
+    (ej. un spot corregido sin reiniciar el proceso, o dos spots que
+    comparten key por error de config) devolvían el DaylightInfo cacheado
+    del primero, con amanecer/atardecer de coordenadas equivocadas.
+    """
+    from core.analysis.daylight import get_daylight_for_forecast_hour
+    cache = {}
+
+    spot_bsas = make_spot(lat=-34.6, lon=-58.4, tz="America/Argentina/Buenos_Aires")
+    spot_anchorage = make_spot(lat=61.2, lon=-149.9, tz="America/Anchorage")
+    assert spot_bsas.key == spot_anchorage.key, \
+        "sanity check: make_spot() siempre usa key='test_spot' — mismo escenario del hallazgo"
+
+    dt = datetime(2025, 6, 21, 12, 0, tzinfo=timezone.utc)  # solsticio: maximiza la diferencia real de horas de luz
+
+    info_bsas = get_daylight_for_forecast_hour(spot_bsas, dt, _cache=cache)
+    info_anchorage = get_daylight_for_forecast_hour(spot_anchorage, dt, _cache=cache)
+
+    assert info_bsas is not info_anchorage, \
+        "spots distintos con la misma key no deben compartir entrada de caché"
+    assert len(cache) == 2
+    # Buenos Aires en solsticio de invierno austral (~9h de luz) vs
+    # Anchorage en solsticio de verano boreal (~19h de luz) — si el bug
+    # siguiera presente, el segundo spot recibiría el DaylightInfo del
+    # primero (cacheado), dando la misma duración para ambos.
+    assert info_anchorage.duration_h > info_bsas.duration_h + 5, \
+        f"Anchorage ({info_anchorage.duration_h:.1f}h) debe tener muchas más horas de luz que Buenos Aires " \
+        f"({info_bsas.duration_h:.1f}h) en el solsticio — si son iguales, el caché está colisionando"
+
+
 def test_forecast_hour_cache_dias_distintos():
     """Días distintos deben crear entradas separadas en cache."""
     from core.analysis.daylight import get_daylight_for_forecast_hour

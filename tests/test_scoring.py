@@ -116,6 +116,52 @@ def load_fixture_forecast(spot: SpotConfig):
     return hours
 
 
+# El fixture usa fechas absolutas fijas (2025-02-01). Un instante justo
+# antes de su primera hora (10:00Z) — así el horizonte de 48h y el filtro
+# de horas ya pasadas de detectar_ventanas() lo tratan siempre como
+# "reciente", sin importar cuándo corra la suite en la realidad.
+#
+# Regresión C1: antes detectar_ventanas() usaba el reloj real sin mockear,
+# así que esto dependía de que 2025-02-01 siguiera cayendo dentro del
+# horizonte de 48h — dejó de ser cierto con el simple paso del tiempo
+# (test_ventanas_desde_fixture pasó a fallar; test_ventana_tiene_descripcion
+# y test_ventanas_ordenadas_por_score quedaron "pasando" en falso, sin
+# ejercitar nada real, porque ambos degradan a comparaciones triviales
+# sobre una lista de ventanas vacía).
+#
+# Se fija el RELOJ, no las fechas del fixture, a propósito: desplazar las
+# fechas del fixture a "ahora" habría cambiado la estación del año para el
+# cálculo de luz solar del spot (el fixture fue diseñado para verano
+# austral — sunrise ~06:03/sunset ~20:03 en Mar del Plata; correr la
+# misma suite en invierno real movería silenciosamente qué horas del
+# fixture caen en luz de día, sin que nadie lo haya decidido a propósito).
+#
+# Las horas del fixture también se corrieron +4h (06-10Z -> 10-14Z,
+# 14Z/18Z -> 18Z/19Z) respecto de la versión original: con el amanecer
+# real para Mar del Plata el 1/feb (~09:03 UTC), 06:00-08:00Z caían de
+# noche y is_daylight() las descartaba, dejando solo 3 horas diurnas
+# sueltas (10Z, 14Z, 18Z) separadas por huecos de 4h — nunca 2 horas
+# consecutivas, el mínimo que exige el fix #26. Ninguna combinación de
+# reloj podía producir una ventana con esas fechas; no era un problema
+# de vencimiento sino del fixture en sí. El corrimiento preserva los
+# valores de swell/viento/marea intactos y solo reubica las horas dentro
+# de la ventana diurna real, además de dejar 18Z/19Z consecutivas (antes
+# 14Z/18Z, con hueco) para formar una segunda ventana de score menor,
+# necesaria para test_ventanas_ordenadas_por_score.
+FIXTURE_AHORA = datetime(2025, 2, 1, 9, 0, tzinfo=timezone.utc)
+
+
+def _detectar_ventanas_fixture(forecast, spot, **kwargs):
+    """detectar_ventanas() con el reloj fijado a FIXTURE_AHORA — ver nota arriba."""
+    class _RelojFijoFixture(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return FIXTURE_AHORA.astimezone(tz) if tz else FIXTURE_AHORA
+
+    with patch("core.windows.detector.datetime", _RelojFijoFixture):
+        return detectar_ventanas(forecast, spot, **kwargs)
+
+
 # ------------------------------------------------------------------
 # Tests de sub-funciones
 # ------------------------------------------------------------------
@@ -910,17 +956,20 @@ class TestDetectorVentanas(unittest.TestCase):
     def test_ventanas_desde_fixture(self):
         spot = make_spot()
         forecast = load_fixture_forecast(spot)
-        ventanas = detectar_ventanas(forecast, spot, umbral=0.50)
-        # Al menos una ventana con las condiciones del fixture (mañana offshore + 14s)
+        ventanas = _detectar_ventanas_fixture(forecast, spot, umbral=0.50)
+        # Al menos una ventana con las condiciones diurnas del fixture (10:00-14:00Z)
         self.assertGreater(len(ventanas), 0)
 
     def test_ventana_tiene_descripcion(self):
         spot = make_spot()
         forecast = load_fixture_forecast(spot)
-        ventanas = detectar_ventanas(forecast, spot, umbral=0.50)
-        if ventanas:
-            self.assertIsInstance(ventanas[0].descripcion, str)
-            self.assertGreater(len(ventanas[0].descripcion), 5)
+        ventanas = _detectar_ventanas_fixture(forecast, spot, umbral=0.50)
+        # Sin "if ventanas:" a propósito: con el reloj fijo, ventanas nunca
+        # debería quedar vacío acá — si eso pasara, este assert debe fallar
+        # de forma ruidosa, no degradar a un pase silencioso sin sentido.
+        self.assertGreater(len(ventanas), 0)
+        self.assertIsInstance(ventanas[0].descripcion, str)
+        self.assertGreater(len(ventanas[0].descripcion), 5)
 
     def test_descripcion_no_dice_offshore_con_viento_calmo_onshore(self):
         """
@@ -979,7 +1028,10 @@ class TestDetectorVentanas(unittest.TestCase):
     def test_ventanas_ordenadas_por_score(self):
         spot = make_spot()
         forecast = load_fixture_forecast(spot)
-        ventanas = detectar_ventanas(forecast, spot, umbral=0.40)
+        ventanas = _detectar_ventanas_fixture(forecast, spot, umbral=0.40)
+        # assertEqual([], sorted([])) pasaría trivialmente sin comparar nada
+        # -- exigimos más de una ventana para que el chequeo de orden sea real.
+        self.assertGreater(len(ventanas), 1, "necesito 2+ ventanas para que el chequeo de orden sea significativo")
         scores = [v.score_promedio for v in ventanas]
         self.assertEqual(scores, sorted(scores, reverse=True))
 

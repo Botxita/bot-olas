@@ -35,6 +35,25 @@
         }
       }
     },
+    "tarapaca": {
+      "nombre": "Tarapacá (Iquique)",
+      "spots": {
+        "cavancha": {
+          "nombre": "Cavancha",
+          "ciudad": "Iquique",
+          "lat": -20.2313775, "lon": -70.1469015,
+          "orientacion_costa_deg": 270, "tolerancia_swell_deg": 30,
+          "tipo_break": "reef", "fondo": "roca",
+          "marea": {"rango_optimo_min_m": 0.2, "rango_optimo_max_m": 1.0, "tipo_efecto": "low_better", "nota": "Proxy sea_level_height_msl — no es datum náutico"},
+          "swell": {"altura_min_m": 0.8, "altura_max_m": 3.5, "periodo_min_s": 12, "direcciones_ideales": [270, 290]},
+          "viento": {"vel_max_offshore_kmh": 30, "vel_max_onshore_kmh": 10},
+          "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
+          "fuente_datos": "open-meteo",
+          "notas": "Reef/beach break frente a la ciudad de Iquique, izquierdas y derechas. Mejor en marea baja. Coordenadas OpenStreetMap; orientación derivada de swell ideal W + offshore E (fuentes: surf-forecast, stormrider). altura_min/max, periodo_min_s, marea (rango numérico) y viento confirmados explícitamente por Ivan como reutilización de Las Machas (Arica, mismo tipo de ola); tolerancia_swell_deg confirmada por Ivan como reutilización de El Gringo (Arica, mismo fondo roca/reef) — sin verificación cartográfica adicional para ninguno de estos valores.",
+          "tz": "America/Santiago"
+        }
+      }
+    },
     "valparaiso": {
       "nombre": "Valparaíso / Viña del Mar",
       "spots": {

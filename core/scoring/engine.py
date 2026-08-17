@@ -468,6 +468,26 @@ def _generar_flags(
 # Función principal
 # ---------------------------------------------------------------------------
 
+def ajustar_swell(swell: SwellData, spot: SpotConfig) -> SwellData:
+    """
+    Aplica los ajustes de calibración del spot (delta_altura, factor_periodo)
+    a un SwellData crudo — la misma transformación que calcular_score() usa
+    internamente para puntuar. Pública para que otros consumidores (ej.
+    core/windows/detector.py, al armar el texto descriptivo de una ventana)
+    trabajen con los mismos valores que el motor usó para el score, en vez
+    de leer los crudos de ForecastHour — antes, el detector mostraba "13s"
+    para una hora que el score trató como "14.3s groundswell" (#28).
+
+    altura_m se clampea a piso 0.0 (ver nota en calcular_score).
+    """
+    return SwellData(
+        altura_m=max(0.0, swell.altura_m + spot.delta_altura),
+        periodo_s=swell.periodo_s * spot.factor_periodo,
+        direccion_deg=swell.direccion_deg,
+        altura_viento_m=swell.altura_viento_m,
+    )
+
+
 def calcular_score(hour: ForecastHour, spot: SpotConfig) -> ScoreBreakdown:
     """
     Calcula el score completo para una hora de pronóstico en un spot dado.
@@ -488,12 +508,7 @@ def calcular_score(hour: ForecastHour, spot: SpotConfig) -> ScoreBreakdown:
     # resultado negativo, y _energia_proxy (H²) pierde el signo al elevar
     # al cuadrado — una config de calibración rota terminaba puntuando
     # como si fuera una ola grande real en vez de "0m, sin ola".
-    swell_ajustado = SwellData(
-        altura_m=max(0.0, hour.swell.altura_m + spot.delta_altura),
-        periodo_s=hour.swell.periodo_s * spot.factor_periodo,
-        direccion_deg=hour.swell.direccion_deg,
-        altura_viento_m=hour.swell.altura_viento_m,
-    )
+    swell_ajustado = ajustar_swell(hour.swell, spot)
     # delta_marea es independiente de delta_altura (regresión #13) — se
     # aplica acá para que el score de marea y sus flags usen el mismo
     # nivel calibrado que ya muestra core/analysis/tides.py, no el nivel

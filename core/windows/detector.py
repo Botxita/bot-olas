@@ -17,7 +17,7 @@ import os
 from datetime import datetime, timezone, timedelta
 from typing import List
 
-from ..scoring.engine import calcular_score, _tipo_viento
+from ..scoring.engine import calcular_score, _tipo_viento, ajustar_swell
 from ..scoring.models import ForecastHour, ScoreBreakdown, SpotConfig, VentanaOptima
 from ..analysis.daylight import get_daylight_for_forecast_hour, is_daylight
 
@@ -293,15 +293,21 @@ def _generar_descripcion(
     else:
         highlights.append("viento regular")
 
-    # Período
-    T = pico_hour.swell.periodo_s
+    # Período y altura — usa los valores AJUSTADOS por delta_altura/
+    # factor_periodo del spot, los mismos que calcular_score() usó para
+    # puntuar (ver ajustar_swell en engine.py). Antes se leían los crudos
+    # de ForecastHour: un período crudo de 13s con factor_periodo=1.1 se
+    # mostraba como "13s" aunque el score usó 14.3s y calificó como
+    # groundswell — la descripción contradecía el score (#28).
+    swell_ajustado = ajustar_swell(pico_hour.swell, spot)
+    T = swell_ajustado.periodo_s
     if T >= 14:
         highlights.append(f"groundswell {T:.0f}s")
     elif T >= 10:
         highlights.append(f"{T:.0f}s")
 
     # Altura
-    H = pico_hour.swell.altura_m
+    H = swell_ajustado.altura_m
     highlights.append(f"{H:.1f}m")
 
     # Marea (si es relevante)

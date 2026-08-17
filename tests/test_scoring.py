@@ -904,6 +904,35 @@ class TestDetectorVentanas(unittest.TestCase):
         self.assertNotIn("offshore", ventanas[0].descripcion)
         self.assertIn("viento calmo", ventanas[0].descripcion)
 
+    def test_descripcion_usa_altura_y_periodo_ajustados(self):
+        """
+        Regresión #28: la descripción debe mostrar los mismos valores
+        AJUSTADOS (delta_altura, factor_periodo) que calcular_score() usó
+        para puntuar, no los crudos de ForecastHour. Ejemplo del hallazgo:
+        altura cruda 0.7m con delta_altura=+0.3 → el score usa 1.0m, pero
+        la descripción mostraba "0.7m". Período crudo 13s con
+        factor_periodo=1.1 → el score usa 14.3s (califica como
+        groundswell), pero la descripción mostraba "13s" sin el highlight
+        "groundswell".
+        """
+        spot = make_spot(delta_altura=0.3)
+        spot.factor_periodo = 1.1
+        ahora = datetime.now(timezone.utc)
+        base = (ahora + timedelta(days=1)).replace(hour=15, minute=0, second=0, microsecond=0)
+        cond = dict(altura=0.7, periodo=13, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0)
+        forecast = [
+            make_hour(ts=base, **cond),
+            make_hour(ts=base + timedelta(hours=1), **cond),
+        ]
+
+        ventanas = detectar_ventanas(forecast, spot, umbral=0.60)
+        self.assertEqual(len(ventanas), 1, f"Esperaba 1 ventana: {ventanas}")
+        desc = ventanas[0].descripcion
+        self.assertIn("1.0m", desc)
+        self.assertNotIn("0.7m", desc)
+        self.assertIn("groundswell 14s", desc)
+        self.assertNotIn("13s", desc)
+
     def test_ventanas_ordenadas_por_score(self):
         spot = make_spot()
         forecast = load_fixture_forecast(spot)

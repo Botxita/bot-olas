@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from datetime import date, datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
+from unittest.mock import patch
 
 from core.scoring.models import (
     ForecastHour, SwellData, WindData, TideData,
@@ -35,6 +36,7 @@ from bot.formatters import (
     formato_vista_horaria,
     formato_semana,
     formato_dia_completo,
+    formato_proximas_olas,
 )
 
 
@@ -518,6 +520,32 @@ def test_dia_completo_sin_mareas_ok():
     # fuente del disclaimer, no debe filtrarse acá.
     assert s.count("proxy MSL") == 1
     assert "MAREAS" not in s
+
+
+# ---------------------------------------------------------------------------
+# formato_proximas_olas — "próxima oportunidad" más allá de 48h (#A2)
+# ---------------------------------------------------------------------------
+
+def test_proximas_olas_umbral_compara_score_total_no_score_100_redondeado():
+    """
+    Regresión #A2: comparar contra round(score_total*100) en vez de
+    score_total directo introduce falsos positivos en el borde —
+    score_total=0.699 redondea a score_100=70, que pasaría un umbral de
+    70 aunque 0.699 sea estrictamente menor a 0.70 en la escala real que
+    usa detectar_ventanas() para armar las ventanas óptimas.
+    """
+    ahora = datetime.now(timezone.utc)
+    ts = ahora + timedelta(hours=50)  # más allá de las 48h que ya cubren `ventanas`
+    hour = make_hour(ts=ts)
+
+    with patch("core.analysis.daylight.is_daylight", return_value=True):
+        with patch("core.scoring.engine.calcular_score", return_value=make_breakdown(0.699)):
+            s_bajo = formato_proximas_olas([hour], [], SPOT, umbral_score=0.70)
+        with patch("core.scoring.engine.calcular_score", return_value=make_breakdown(0.700)):
+            s_alto = formato_proximas_olas([hour], [], SPOT, umbral_score=0.70)
+
+    assert "Próxima oportunidad" not in s_bajo, "0.699 no debería calificar contra un umbral de 0.70"
+    assert "Próxima oportunidad" in s_alto, "0.700 sí debería calificar contra un umbral de 0.70"
 
 
 # ---------------------------------------------------------------------------

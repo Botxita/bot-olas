@@ -12,6 +12,7 @@ Convenciones de callback_data:
   back:<destino>
   back:spot:<spot_key>:<origen>
   back:favoritos                        ← pantalla "Mis favoritos"
+  nivel:<principiante|intermedio|avanzado>  ← onboarding / comando /nivel (#A2)
 
 <origen> viaja en el propio callback_data (no en la sesión) — el país/región
 de un spot para el botón "Volver" del menú se derivan de spot.pais/spot.region
@@ -271,6 +272,19 @@ def kb_favoritos(favoritos: List[Tuple[str, str]]) -> InlineKeyboardMarkup:
         )])
     botones.append([InlineKeyboardButton("📍 Explorar spots", callback_data="back:paises")])
     return InlineKeyboardMarkup(botones)
+
+
+# ------------------------------------------------------------------
+# Nivel de surf (#A2) — onboarding en /start y comando /nivel
+# ------------------------------------------------------------------
+
+def kb_nivel() -> InlineKeyboardMarkup:
+    """Selector de nivel de surf (principiante/intermedio/avanzado)."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🐣 Principiante", callback_data="nivel:principiante")],
+        [InlineKeyboardButton("🏄 Intermedio", callback_data="nivel:intermedio")],
+        [InlineKeyboardButton("🔥 Avanzado", callback_data="nivel:avanzado")],
+    ])
 
 
 # ------------------------------------------------------------------

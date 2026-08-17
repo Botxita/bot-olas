@@ -36,6 +36,10 @@ class DayScore:
 
     @property
     def es_bueno(self) -> bool:
+        """Umbral por defecto (55) para uso standalone de DayScore. No es
+        lo que decide WeeklyAnalysis.dias_buenos — analizar_semana() usa
+        el umbral_dia_bueno recibido como parámetro (#A2, nivel de
+        surfista), que puede ser distinto de 55."""
         return self.score_100 >= 55
 
     @property
@@ -55,7 +59,7 @@ class WeeklyAnalysis:
     scores_por_dia: List[DayScore]      # todos los días, ordenados cronológicamente
     mejor_dia: DayScore                 # día con mayor score_promedio
     peor_dia: DayScore                  # día con menor score_promedio
-    dias_buenos: List[DayScore]         # días con score >= 55
+    dias_buenos: List[DayScore]         # días con score >= umbral_dia_bueno (ver analizar_semana)
     spot: SpotConfig
 
     @property
@@ -84,6 +88,7 @@ def analizar_semana(
     score_fn=None,
     max_dias: int = 7,
     ahora: Optional[datetime] = None,
+    umbral_dia_bueno: int = 55,
 ) -> Optional[WeeklyAnalysis]:
     """
     Analiza hasta 7 días de forecast desde HOY y retorna el ranking semanal.
@@ -100,10 +105,27 @@ def analizar_semana(
                se usa para ambos filtros — evita que dos lecturas
                independientes del reloj real diverjan cerca de medianoche.
                Inyectable para tests deterministas.
+        umbral_dia_bueno: score_100 mínimo para que un día cuente en
+               dias_buenos (default 55, igual que DayScore.es_bueno).
+               El caller (bot/handlers/main.py) lo ajusta según el nivel
+               de surf del usuario (#A2) — el score en sí no cambia, solo
+               qué tan exigente es el bot para marcar un día como bueno.
 
     Returns:
         WeeklyAnalysis con scores por día y mejor día, o None si no hay datos.
     """
+    # Mismo criterio que detectar_ventanas() (#23/#30): un umbral fuera de
+    # rango es config imposible de interpretar, no un caso silencioso a
+    # normalizar — fallar visible en vez de degradar en silencio. Validado
+    # ANTES del return-temprano por forecast vacío, mismo orden que
+    # detectar_ventanas(), para que un umbral inválido falle siempre,
+    # incluso con forecast=[].
+    if isinstance(umbral_dia_bueno, bool) or not isinstance(umbral_dia_bueno, int) \
+            or not (0 <= umbral_dia_bueno <= 100):
+        raise ValueError(
+            f"umbral_dia_bueno debe ser un entero entre 0 y 100, recibido: {umbral_dia_bueno!r}"
+        )
+
     score_fn = score_fn or _default_score_fn()
     if score_fn is None or not forecast:
         return None
@@ -153,7 +175,7 @@ def analizar_semana(
 
     mejor_dia = max(dias_con_datos, key=lambda d: d.score_promedio)
     peor_dia = min(dias_con_datos, key=lambda d: d.score_promedio)
-    dias_buenos = [d for d in dias_con_datos if d.es_bueno]
+    dias_buenos = [d for d in dias_con_datos if d.score_100 >= umbral_dia_bueno]
 
     return WeeklyAnalysis(
         scores_por_dia=scores_por_dia,

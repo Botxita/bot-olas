@@ -360,13 +360,88 @@ def test_weekly_peor_dia_tiene_menor_score():
 
 
 def test_weekly_dias_buenos_threshold():
-    """dias_buenos debe contener solo días con score_100 >= 55."""
+    """dias_buenos debe contener solo días con score_100 >= 55 (default)."""
     forecast = make_forecast_dias(FECHA, 5)
     sf = mock_score_fn(scores_dict(forecast))
     result = analizar_semana(forecast, SPOT, score_fn=sf, ahora=AHORA_FECHA)
     assert result is not None
     for d in result.dias_buenos:
         assert d.score_100 >= 55, f"Día {d.fecha} en dias_buenos pero score={d.score_100}"
+
+
+def _forecast_3_dias_scores(scores_por_dia):
+    """3 días consecutivos desde FECHA, cada uno con un score fijo distinto."""
+    tz = ZoneInfo("America/Argentina/Buenos_Aires")
+    forecast = []
+    for dia_offset, score_dia in enumerate(scores_por_dia):
+        fecha = FECHA + timedelta(days=dia_offset)
+        medianoche = datetime(fecha.year, fecha.month, fecha.day, 0, 0, tzinfo=tz)
+        for hora in range(24):
+            dt_utc = (medianoche + timedelta(hours=hora)).astimezone(timezone.utc)
+            h = ForecastHour(
+                timestamp=dt_utc,
+                swell=SwellData(1.5, 12.0, 95.0),
+                wind=WindData(15.0, 20.0, 180.0),
+                tide=TideData(0.8),
+            )
+            h._test_score = score_dia
+            forecast.append(h)
+    return forecast
+
+
+def test_weekly_umbral_dia_bueno_personalizado():
+    """#A2: umbral_dia_bueno (derivado del nivel de surf) decide qué días
+    entran en dias_buenos, no el hardcode de 55 -- 3 días con score 45/60/70
+    fijo, verificados contra los 3 umbrales reales que usa cada nivel."""
+    forecast = _forecast_3_dias_scores([0.45, 0.60, 0.70])
+    sf = mock_score_fn({h.timestamp: getattr(h, '_test_score', 0.5) for h in forecast})
+
+    # avanzado (45): los 3 días califican
+    result_avanzado = analizar_semana(forecast, SPOT, score_fn=sf, ahora=AHORA_FECHA, umbral_dia_bueno=45)
+    assert {d.score_100 for d in result_avanzado.dias_buenos} == {45, 60, 70}
+
+    # intermedio (55, default): solo 60 y 70
+    result_intermedio = analizar_semana(forecast, SPOT, score_fn=sf, ahora=AHORA_FECHA, umbral_dia_bueno=55)
+    assert {d.score_100 for d in result_intermedio.dias_buenos} == {60, 70}
+
+    # principiante (65): solo 70
+    result_principiante = analizar_semana(forecast, SPOT, score_fn=sf, ahora=AHORA_FECHA, umbral_dia_bueno=65)
+    assert {d.score_100 for d in result_principiante.dias_buenos} == {70}
+
+
+def test_weekly_umbral_dia_bueno_bool_lanza_error():
+    forecast = make_forecast_dias(FECHA, 1)
+    sf = mock_score_fn(scores_dict(forecast))
+    with pytest.raises(ValueError):
+        analizar_semana(forecast, SPOT, score_fn=sf, ahora=AHORA_FECHA, umbral_dia_bueno=True)
+
+
+def test_weekly_umbral_dia_bueno_negativo_lanza_error():
+    forecast = make_forecast_dias(FECHA, 1)
+    sf = mock_score_fn(scores_dict(forecast))
+    with pytest.raises(ValueError):
+        analizar_semana(forecast, SPOT, score_fn=sf, ahora=AHORA_FECHA, umbral_dia_bueno=-1)
+
+
+def test_weekly_umbral_dia_bueno_mayor_a_100_lanza_error():
+    forecast = make_forecast_dias(FECHA, 1)
+    sf = mock_score_fn(scores_dict(forecast))
+    with pytest.raises(ValueError):
+        analizar_semana(forecast, SPOT, score_fn=sf, ahora=AHORA_FECHA, umbral_dia_bueno=101)
+
+
+def test_weekly_umbral_dia_bueno_float_lanza_error():
+    forecast = make_forecast_dias(FECHA, 1)
+    sf = mock_score_fn(scores_dict(forecast))
+    with pytest.raises(ValueError):
+        analizar_semana(forecast, SPOT, score_fn=sf, ahora=AHORA_FECHA, umbral_dia_bueno=55.5)
+
+
+def test_weekly_umbral_dia_bueno_invalido_falla_incluso_con_forecast_vacio():
+    """La validación debe ser fail-fast, antes del return-temprano por
+    forecast vacío (mismo orden que detectar_ventanas(), #23/#30)."""
+    with pytest.raises(ValueError):
+        analizar_semana([], SPOT, score_fn=mock_score_fn({}), umbral_dia_bueno=-1)
 
 
 def test_weekly_mejor_ventana_semana_desempate_usa_score_real():

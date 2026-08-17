@@ -32,6 +32,7 @@ from telegram.ext import (
     MessageHandler,
     Filters,
 )
+from telegram.utils.helpers import escape_markdown
 
 from core.forecast import get_provider
 from core.forecast.cache import forecast_cache
@@ -69,10 +70,27 @@ from bot.keyboards import (
     kb_post_forecast,
     kb_seleccion_fecha,
     kb_favoritos,
+    kb_nivel,
 )
 
 logger = logging.getLogger(__name__)
 SEPARADOR_MSG = "─" * 22
+
+# Umbrales de recomendación por nivel de surf (#A2). El score 0-100 en sí
+# no cambia con el nivel — solo qué tan exigente es el bot para marcar
+# algo como "vale la pena": un principiante necesita condiciones más
+# prolijas para que se arme una ventana óptima o cuente como día bueno.
+UMBRAL_POR_NIVEL = {
+    "principiante": {"ventana": 0.70, "dia_bueno": 65},
+    "intermedio":   {"ventana": 0.60, "dia_bueno": 55},
+    "avanzado":     {"ventana": 0.50, "dia_bueno": 45},
+}
+
+NOMBRE_NIVEL = {
+    "principiante": "Principiante 🐣",
+    "intermedio": "Intermedio 🏄",
+    "avanzado": "Avanzado 🔥",
+}
 
 
 # ------------------------------------------------------------------
@@ -134,12 +152,12 @@ def _resolver_nombres_favoritos(favs_keys: list) -> list:
 # /start
 # ------------------------------------------------------------------
 
-def handle_start(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    first_name = update.effective_user.first_name or "surfer"
+def _texto_menu_principal(user_id: int, first_name: str):
+    """Texto + teclado del menú de selección de país (pantalla de inicio).
 
-    session_store.update_session(user_id, step="seleccion_pais")
-
+    first_name debe venir ya escapado con escape_markdown(version=2) —
+    esta función lo interpola directo en texto MarkdownV2.
+    """
     paises = listar_paises()
     favs_keys = session_store.get_favoritos(user_id)
     favs = _resolver_nombres_favoritos(favs_keys)
@@ -156,10 +174,46 @@ def handle_start(update: Update, context: CallbackContext):
             "para cualquier spot de Latinoamérica\\.\n\n"
             "¿Dónde vas a surfear? 🏄‍♂️🌍"
         )
+    return texto, kb_seleccion_pais(paises, favoritos=favs)
+
+
+def handle_start(update: Update, context: CallbackContext):
+    user_id = update.effective_user.id
+    # Escapado porque va interpolado en texto MarkdownV2 más abajo — un
+    # first_name real con "_", "*", "(", etc. (ej. "Ivan_Test") rompía el
+    # parseo con BadRequest si no se escapaba (encontrado en revisión #A2).
+    first_name = escape_markdown(update.effective_user.first_name or "surfer", version=2)
+
+    # Onboarding de nivel de surf (#A2): primer uso real, sin nivel guardado
+    # todavía. Gate único — una vez elegido, /start nunca vuelve a mostrarlo.
+    if not session_store.tiene_nivel(user_id):
+        update.message.reply_text(
+            f"🌊 Hola *{first_name}*\\! Bienvenido al *Olas Surfer Bot*\\.\n\n"
+            "Antes de arrancar, contame tu nivel de surf: así el bot ajusta "
+            "qué tan exigente es para avisarte que vale la pena salir\\. "
+            "Lo podés cambiar cuando quieras con /nivel\\.",
+            parse_mode=ParseMode.MARKDOWN_V2,
+            reply_markup=kb_nivel(),
+        )
+        return
+
+    session_store.update_session(user_id, step="seleccion_pais")
+    texto, keyboard = _texto_menu_principal(user_id, first_name)
     update.message.reply_text(
         texto,
         parse_mode=ParseMode.MARKDOWN_V2,
-        reply_markup=kb_seleccion_pais(paises, favoritos=favs),
+        reply_markup=keyboard,
+    )
+
+
+# ------------------------------------------------------------------
+# /nivel — cambiar el nivel de surf en cualquier momento
+# ------------------------------------------------------------------
+
+def handle_nivel(update: Update, context: CallbackContext):
+    update.message.reply_text(
+        "🏄 ¿Cuál es tu nivel de surf?",
+        reply_markup=kb_nivel(),
     )
 
 
@@ -282,6 +336,9 @@ def handle_callback(update: Update, context: CallbackContext):
         desde_favoritos = len(parts) > 1 and parts[1] == "fav"
         _cb_fav_del(query, user_id, parts[0], desde_favoritos=desde_favoritos)
 
+    elif data.startswith("nivel:"):
+        _cb_nivel(query, user_id, data[6:])
+
     else:
         logger.warning("Callback desconocido: %s", data)
 
@@ -377,13 +434,13 @@ def _cb_action(query, user_id: int, accion: str, spot_key: str, desde_favoritos:
         return
 
     if accion == "ahora":
-        _mostrar_ahora(query, spot_key, spot, desde_favoritos=desde_favoritos)
+        _mostrar_ahora(query, user_id, spot_key, spot, desde_favoritos=desde_favoritos)
 
     elif accion == "fecha":
         _cb_mostrar_selector_fecha(query, spot_key, desde_favoritos=desde_favoritos)
 
     elif accion == "ventanas":
-        _mostrar_ventanas(query, spot_key, spot, desde_favoritos=desde_favoritos)
+        _mostrar_ventanas(query, user_id, spot_key, spot, desde_favoritos=desde_favoritos)
 
     elif accion == "horaria":
         # Hora a hora: usa el día de hoy en la tz del spot
@@ -391,7 +448,7 @@ def _cb_action(query, user_id: int, accion: str, spot_key: str, desde_favoritos:
         _mostrar_horaria(query, spot_key, spot, fecha_hoy, desde_favoritos=desde_favoritos)
 
     elif accion == "semana":
-        _mostrar_semana(query, spot_key, spot, desde_favoritos=desde_favoritos)
+        _mostrar_semana(query, user_id, spot_key, spot, desde_favoritos=desde_favoritos)
 
     elif accion == "breakdown":
         _mostrar_breakdown(query, spot_key, spot, desde_favoritos=desde_favoritos)
@@ -404,7 +461,7 @@ def _cb_action(query, user_id: int, accion: str, spot_key: str, desde_favoritos:
 # Acciones concretas
 # ------------------------------------------------------------------
 
-def _mostrar_ahora(query, spot_key: str, spot, desde_favoritos: bool = False):
+def _mostrar_ahora(query, user_id: int, spot_key: str, spot, desde_favoritos: bool = False):
     """Condiciones actuales + tendencia de marea + ventanas próximas + mejor hora de hoy."""
     try:
         _safe_edit(query, "⏳ Consultando pronóstico...")
@@ -421,8 +478,9 @@ def _mostrar_ahora(query, spot_key: str, spot, desde_favoritos: bool = False):
 
         texto = formato_condiciones_actuales(hour, breakdown, spot, tide_analysis=tide_analysis)
 
-        # Ventana más cercana (mínimo 2h)
-        ventanas = detectar_ventanas(forecast, spot)
+        # Ventana más cercana (mínimo 2h) — umbral según nivel de surf (#A2)
+        nivel = session_store.get_nivel(user_id)
+        ventanas = detectar_ventanas(forecast, spot, umbral=UMBRAL_POR_NIVEL[nivel]["ventana"])
         if ventanas:
             texto += f"\n\n{SEPARADOR_MSG}\n*PRÓXIMA VENTANA ÓPTIMA*\n"
             texto += formato_lista_ventanas_corta(ventanas, spot)
@@ -530,13 +588,20 @@ def _mostrar_dia(query, spot_key: str, fecha: date, desde_favoritos: bool = Fals
             _safe_edit(query, "⚠️ Error al obtener el pronóstico.")
 
 
-def _mostrar_ventanas(query, spot_key: str, spot, desde_favoritos: bool = False):
+def _mostrar_ventanas(query, user_id: int, spot_key: str, spot, desde_favoritos: bool = False):
     """Próximas olas — vista 48h hora a hora con horas buenas destacadas."""
     try:
         _safe_edit(query, "⏳ Calculando próximas olas...")
         forecast = _get_forecast_cached(spot_key)
-        ventanas = detectar_ventanas(forecast, spot)
-        texto = formato_proximas_olas(forecast, ventanas, spot)
+        nivel = session_store.get_nivel(user_id)
+        umbral_ventana = UMBRAL_POR_NIVEL[nivel]["ventana"]
+        ventanas = detectar_ventanas(forecast, spot, umbral=umbral_ventana)
+        # Mismo umbral, misma escala (0-1, score_total) para la búsqueda de
+        # "próxima oportunidad" más allá de 48h — antes hardcodeado en 55,
+        # inconsistente con el umbral real usado para armar ventanas (#A2).
+        # Sin redondear a score_100: eso introducía falsos positivos en el
+        # borde (0.699 redondea a 70, pasaría un umbral de 70 igual).
+        texto = formato_proximas_olas(forecast, ventanas, spot, umbral_score=umbral_ventana)
         _safe_edit(query,
             texto,
             parse_mode=ParseMode.MARKDOWN,
@@ -572,12 +637,13 @@ def _mostrar_horaria(query, spot_key: str, spot, fecha: date, desde_favoritos: b
         _safe_edit(query, formato_no_disponible(spot, str(e)))
 
 
-def _mostrar_semana(query, spot_key: str, spot, desde_favoritos: bool = False):
+def _mostrar_semana(query, user_id: int, spot_key: str, spot, desde_favoritos: bool = False):
     """Ranking de los próximos 7 días."""
     try:
         _safe_edit(query, "⏳ Analizando la semana...")
         forecast = _get_forecast_cached(spot_key)
-        analysis = analizar_semana(forecast, spot)
+        nivel = session_store.get_nivel(user_id)
+        analysis = analizar_semana(forecast, spot, umbral_dia_bueno=UMBRAL_POR_NIVEL[nivel]["dia_bueno"])
 
         if analysis is None:
             _safe_edit(query,
@@ -719,11 +785,36 @@ def _cb_fav_del(query, user_id: int, spot_key: str, desde_favoritos: bool = Fals
 
 
 # ------------------------------------------------------------------
+# Nivel de surf (#A2)
+# ------------------------------------------------------------------
+
+def _cb_nivel(query, user_id: int, nivel: str):
+    """Guarda el nivel elegido (onboarding o /nivel) y sigue al menú principal."""
+    if nivel not in NOMBRE_NIVEL:
+        logger.warning("Nivel desconocido en callback: %s", nivel)
+        return
+
+    session_store.set_nivel(user_id, nivel)
+    session_store.update_session(user_id, step="seleccion_pais")
+
+    first_name = escape_markdown(query.from_user.first_name or "surfer", version=2)
+    texto_menu, keyboard = _texto_menu_principal(user_id, first_name)
+    texto = f"✅ Nivel guardado: *{NOMBRE_NIVEL[nivel]}*\\.\n\n{texto_menu}"
+
+    _safe_edit(query,
+        texto,
+        parse_mode=ParseMode.MARKDOWN_V2,
+        reply_markup=keyboard,
+    )
+
+
+# ------------------------------------------------------------------
 # Registro en el dispatcher
 # ------------------------------------------------------------------
 
 def register_handlers(dp: Dispatcher):
     dp.add_handler(CommandHandler("start", handle_start))
+    dp.add_handler(CommandHandler("nivel", handle_nivel))
     dp.add_handler(CommandHandler("ajuste", handle_ajuste))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text))
     dp.add_handler(CallbackQueryHandler(handle_callback))

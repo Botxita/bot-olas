@@ -554,10 +554,21 @@ def formato_proximas_olas(
     forecast: list,
     ventanas: list,
     spot: SpotConfig,
+    umbral_score: float = 0.55,
 ) -> str:
     """
     Muestra las próximas ventanas surfeables como bloques concretos.
     Si no hay ventanas, indica cuándo es la próxima oportunidad.
+
+    umbral_score: score_total mínimo (escala 0-1) para que una hora cuente
+    como "próxima oportunidad" más allá de 48h. Debe ser el mismo umbral
+    (y la misma escala) que detectar_ventanas() usó para armar `ventanas`
+    — el caller lo deriva del nivel de surf del usuario (#A2). Comparado
+    contra score_total, no score_100: redondear a escala 0-100 primero
+    introduce falsos positivos en el borde (0.699 redondea a score_100=70,
+    que pasaría un umbral de 70 aunque 0.699 < 0.70 en la escala real que
+    usa detectar_ventanas()). Default 0.55 preserva el comportamiento
+    previo a A2 para callers que no lo pasan.
     """
     from datetime import timezone as _tz_mod
     from core.scoring.engine import calcular_score
@@ -586,7 +597,7 @@ def formato_proximas_olas(
                 if not is_daylight(h.timestamp, daylight):
                     continue
                 bd = calcular_score(h, spot)
-                if bd.score_100 >= 55:
+                if bd.score_total >= umbral_score:
                     proxima = (h, bd)
                     break
             except Exception:

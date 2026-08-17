@@ -12,6 +12,7 @@ Estructura del estado:
     "plan": "free" | "pro",
     "idioma": "es" | "en" | "pt",
     "favoritos": ["mdq_varese", "chapa_general"],
+    "nivel": "principiante" | "intermedio" | "avanzado",
 }
 
 Para Postgres en producción:
@@ -29,6 +30,9 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 _DB_PATH = os.getenv("SESSION_DB_PATH", "data/sessions.db")
+
+NIVEL_DEFAULT = "intermedio"
+NIVELES_VALIDOS = ("principiante", "intermedio", "avanzado")
 
 
 class SQLiteSessionStore:
@@ -170,6 +174,23 @@ class SQLiteSessionStore:
             "DELETE FROM user_favorites WHERE user_id = ? AND spot_key = ?",
             (user_id, spot_key)
         )
+
+    # ------------------------------------------------------------------
+    # Nivel de surf (#A2) — afecta umbrales de recomendación, no el score
+    # ------------------------------------------------------------------
+
+    def tiene_nivel(self, user_id: int) -> bool:
+        """True si el usuario ya eligió nivel alguna vez (gate del onboarding)."""
+        return "nivel" in self.get_session(user_id)
+
+    def get_nivel(self, user_id: int) -> str:
+        """Nivel guardado, o NIVEL_DEFAULT si nunca se eligió."""
+        return self.get_session(user_id).get("nivel", NIVEL_DEFAULT)
+
+    def set_nivel(self, user_id: int, nivel: str):
+        if nivel not in NIVELES_VALIDOS:
+            raise ValueError(f"nivel inválido: {nivel!r} (válidos: {NIVELES_VALIDOS})")
+        self.update_session(user_id, nivel=nivel)
 
 
 # Instancia global

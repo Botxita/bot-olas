@@ -508,7 +508,7 @@ Esta lista refleja la priorización sugerida en la auditoría original, antes de
 **Podían estar alterando recomendaciones reales en ese momento**, con la config de 59 spots en producción:
 
 1. ✅ Detector no respeta el horizonte de 48h (#22) — resuelto, `d283660`.
-2. 🔲 Salto inverso en los límites de marea del engine — un cambio de milésimas de metro puede cruzar el umbral de ventana óptima (#2) — **sigue abierto**.
+2. ✅ Salto inverso en los límites de marea del engine — un cambio de milésimas de metro puede cruzar el umbral de ventana óptima (#2) — resuelto, `323fb2b`.
 3. ✅ `marea_tipo_efecto` ignorado en 13 spots reales `low_better` (#1) — resuelto, `605a9e1`.
 4. ✅ `analizar_semana()` mezcla horas ya pasadas de hoy (#11) — resuelto, `f663e8b`.
 5. ✅ Límites específicos de período/viento del spot ignorados (#3) — resuelto, `d8638eb`.
@@ -526,3 +526,59 @@ Esta lista refleja la priorización sugerida en la auditoría original, antes de
 **Crash confirmado (no solo silencioso)**: ranking con solo horas nocturnas + `incluir_noche=True` (#12) — ✅ resuelto, `ddc69e6`.
 
 **Sin priorizar en la ronda original — subgrupos scoring (#2, #6, #7, #8), analysis (#14-#21), windows (#25-#29) y registry+persistencia (#31, hallado después, durante la revisión del fix #13) — todos ✅ RESUELTO, ver detalle en cada hallazgo arriba.** Con esto, los 31 hallazgos de código quedan 100% cerrados.
+
+---
+
+## Fase 2 — Spots nuevos agregados (post-auditoría)
+
+No son hallazgos de bug — se documentan acá con el mismo estándar de trazabilidad (fuente, nivel de confianza) usado en la auditoría geográfica (#32-#55), para no perder el registro de qué dato viene de dónde. Cada spot pasó por revisión de Codex y tiene su propio commit. El bot pasa de 59 a **64 spots en 8 países** (se agregan El Salvador y Panamá como países nuevos).
+
+### Cavancha — Iquique, Chile (región nueva `tarapaca`)
+
+**✅ APLICADO** — commit `e58593e`.
+
+- `lat/lon`: OpenStreetMap Nominatim, alta confianza (geocoding directo).
+- `orientacion_costa_deg=270` (oeste): derivado de 2 fuentes independientes coincidentes — swell ideal desde el W + offshore desde el E (surf-forecast.com, stormrider.surf).
+- `tipo_break="reef"`, `fondo="roca"`: fuentes describían un mix beach/reef ambiguo — decisión explícita de Ivan, no inferencia.
+- `direcciones_ideales=[270, 290]`: fuentes mencionaban también buen swell desde el S, descartado por Ivan por no calzar con una costa simple orientada al oeste.
+- Calibración numérica (tolerancia, altura, período, viento, marea): reutilizada de spots ya cargados en Chile (El Gringo para tolerancia por fondo roca/reef; Las Machas para el resto), confirmado explícitamente por Ivan campo por campo — no inferido.
+- `marea.tipo_efecto="low_better"`: fuente directa ("best around low tide").
+
+### Tiririca — Itacaré, Bahía, Brasil (región nueva `bahia`)
+
+**✅ APLICADO** — commit `babb99e`.
+
+- `lat/lon`: OpenStreetMap Nominatim, alta confianza.
+- `orientacion_costa_deg=112` (ESE): swell ideal E/SE + offshore WNW (surf-forecast.com), 2 fuentes coincidentes. Una tercera fuente contradictoria ("offshore E") fue descartada por Ivan — probablemente describe Itacarezinho/Engenhoca, spots distintos del mismo corredor.
+- `tipo_break="beach"`, `fondo="arena"`: sin ambigüedad entre fuentes.
+- `tz="America/Bahia"`: corrige un error propio — el archivo no usa `America/Sao_Paulo` uniformemente para todo Brasil (los spots de Rio Grande do Norte ya usan `America/Fortaleza`); la convención real es zona IANA correcta por estado.
+- Calibración numérica: mediana/mayoría del cluster de Rio Grande do Norte (Pipa, Praia do Madeiro, Baía Formosa — beach breaks brasileños de perfil climático similar ya calibrados), confirmada explícitamente por Ivan campo por campo.
+
+### El Sunzal — La Libertad, El Salvador (país y región nuevos, `SV` / `la_libertad`)
+
+**✅ APLICADO** — commit `385c823`. Requirió agregar `SV`/`PA` a `_TZ_FALLBACK_POR_PAIS` en `core/scoring/models.py` primero (commit `e44b19a`, revisado por Codex por tocar un archivo protegido según `AGENTS.md`).
+
+- `lat/lon`: OpenStreetMap Nominatim.
+- `orientacion_costa_deg=202` (SSW): swell ideal SSW + offshore NNE (surf-forecast.com), 2 fuentes coincidentes.
+- `tipo_break="point"`, `fondo="roca"`: sin ambigüedad ("right-hand point break... cobblestones and boulders").
+- Calibración numérica: reutilizada de Pavones (Costa Rica, point/roca, mismo régimen de swell SW centroamericano) — Ivan confirmó reutilizar igual pese a que Pavones es típicamente una ola más grande/exigente que El Sunzal.
+
+### El Tunco — La Libertad, El Salvador (misma región que El Sunzal, spot distinto)
+
+**✅ APLICADO** — commit `e16d76f`.
+
+- Comparte playa con El Sunzal (~700m/15min caminando) pero es un break completamente distinto: beach/arena vs. point/roca.
+- `lat/lon`: OpenStreetMap Nominatim, punto real distinto al de El Sunzal (no inventado para diferenciarlos artificialmente).
+- `orientacion_costa_deg=220` (SW): swell ideal SW + offshore NE — cardinal distinto al de El Sunzal porque las fuentes daban valores específicos por spot, no promediado.
+- `tipo_break="beach"`, `fondo="arena"`: sin ambigüedad, contrasta explícitamente con El Sunzal en las mismas fuentes.
+- Calibración numérica: reutilizada de Jacó (Costa Rica, beach/arena, mismo régimen, perfil de accesibilidad similar), confirmada explícitamente por Ivan.
+
+### Santa Catalina — La Punta, Veraguas, Panamá (país y región nuevos, `PA` / `veraguas`)
+
+**✅ APLICADO** — commit `17974a4`.
+
+- `lat/lon`: OpenStreetMap Nominatim — centro del poblado costero (había 2 resultados homónimos en Veraguas; se descartó uno tierra adentro en La Mesa). Ancla al pueblo, no a "La Punta" específicamente (sin entrada separada en Nominatim).
+- `orientacion_costa_deg=190` (S-SSW): swell ideal SSW + offshore N (tourismpanama.com/surf-forecast.com), 2 fuentes coincidentes.
+- `tipo_break="point"`, `fondo="roca"`: sin ambigüedad ("point break over a rocky reef", "volcanic reef").
+- Lateralidad de la ola (derecha/izquierda) investigada a fondo por fuentes contradictorias — se documenta en la nota del spot como predominantemente derecha con izquierdas ocasionales; no afecta ningún campo del score.
+- Calibración numérica: reutilizada de Pavones (mismo criterio que El Sunzal, mejor calce de magnitud típica de ola).

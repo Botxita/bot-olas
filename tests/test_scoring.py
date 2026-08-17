@@ -367,6 +367,49 @@ class TestDireccionSwell(unittest.TestCase):
         finally:
             actualizar_ajuste("mdq_playa_grande", "delta_marea", valor_original)
 
+    def test_reaplicar_ajustes_aplica_valores_persistidos(self):
+        """
+        Regresión #31: reaplicar_ajustes() (llamada desde main.py al
+        arranque con los ajustes leídos de SQLite) debe aplicar cada
+        spot_key/param/valor sobre el registry ya cargado — simula lo que
+        antes se perdía en cada restart del proceso porque nada volvía a
+        leer session_store.get_all_spot_adjustments().
+        """
+        from core.spots.registry import actualizar_ajuste, get_spot, reaplicar_ajustes
+
+        spot = get_spot("mdq_playa_grande")
+        original_altura = spot.delta_altura
+        original_periodo = spot.factor_periodo
+        try:
+            reaplicar_ajustes({"mdq_playa_grande": {"delta_altura": 0.25, "factor_periodo": 1.15}})
+            actualizado = get_spot("mdq_playa_grande")
+            self.assertEqual(actualizado.delta_altura, 0.25)
+            self.assertEqual(actualizado.factor_periodo, 1.15)
+        finally:
+            actualizar_ajuste("mdq_playa_grande", "delta_altura", original_altura)
+            actualizar_ajuste("mdq_playa_grande", "factor_periodo", original_periodo)
+
+    def test_reaplicar_ajustes_ignora_entradas_invalidas_sin_crashear(self):
+        """
+        Un spot_key que ya no existe (renombrado/eliminado del JSON desde
+        que se guardó el ajuste) o un param desconocido no deben interrumpir
+        el reaplicado del resto — se registran como warning y se saltean.
+        """
+        from core.spots.registry import actualizar_ajuste, get_spot, reaplicar_ajustes
+
+        spot = get_spot("mdq_playa_grande")
+        original_altura = spot.delta_altura
+        try:
+            reaplicar_ajustes({
+                "spot_que_ya_no_existe": {"delta_altura": 0.5},
+                "mdq_playa_grande": {"param_inventado": 1.0, "delta_altura": 0.3},
+            })
+            # El spot inexistente no debe crashear, y dentro del mismo spot
+            # el param inválido no debe bloquear el param válido siguiente.
+            self.assertEqual(get_spot("mdq_playa_grande").delta_altura, 0.3)
+        finally:
+            actualizar_ajuste("mdq_playa_grande", "delta_altura", original_altura)
+
 
 class TestViento(unittest.TestCase):
     def test_offshore_calmo(self):

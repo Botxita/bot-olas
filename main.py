@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 from telegram.ext import Updater
 
 from bot.handlers.main import register_handlers
+from core.spots.registry import reaplicar_ajustes
+from persistence.session_store import session_store
 
 logging.basicConfig(
     level=logging.INFO,
@@ -50,6 +52,19 @@ def main():
     if not token:
         logger.error("TELEGRAM_BOT_TOKEN no configurado.")
         sys.exit(1)
+
+    # Reaplicar ajustes de /ajuste persistidos en SQLite antes de servir
+    # tráfico — sin esto se pierden en cada restart del proceso (#31).
+    try:
+        ajustes_persistidos = session_store.get_all_spot_adjustments()
+        reaplicar_ajustes(ajustes_persistidos)
+        if ajustes_persistidos:
+            logger.info(
+                "Ajustes de spot reaplicados desde SQLite: %d spot(s)",
+                len(ajustes_persistidos),
+            )
+    except Exception as e:
+        logger.error("No se pudieron reaplicar los ajustes de spot persistidos: %s", e)
 
     webhook_url = os.getenv("WEBHOOK_URL", "")
     port = int(os.getenv("PORT", "10000"))

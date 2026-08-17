@@ -212,3 +212,46 @@ def recargar():
     _registry = None
     _raw_tree = None
     _cargar_registry()
+
+
+def reaplicar_ajustes(ajustes: Dict[str, Dict[str, float]]) -> None:
+    """
+    Reaplica sobre el registry ya cargado ajustes de /ajuste persistidos en
+    una fuente externa (SQLite, ver
+    persistence/session_store.py::get_all_spot_adjustments()). Pensado para
+    llamarse una vez al arranque del proceso (ver main.py), antes de
+    empezar a servir tráfico.
+
+    Sin esto, un ajuste aplicado con /ajuste persistía en la tabla
+    spot_adjustments (session_store.set_spot_adjustment() sí se llama
+    desde el handler) pero nunca se releía al reiniciar el proceso — el
+    ajuste funcionaba mientras el proceso seguía vivo, pero se perdía en
+    cada restart (Render free tier reinicia con frecuencia: cold starts,
+    deploys, sleep del tier gratuito) sin que el mensaje de confirmación
+    de /ajuste dejara ver que la persistencia era parcial (#31).
+
+    core/ no importa persistence/ directamente (capas externas no deben
+    ser una dependencia de core/) — el caller (main.py) es responsable de
+    leer los ajustes desde SQLite y pasarlos ya armados acá.
+
+    Un spot_key o param inválido en los datos persistidos (ej. un spot
+    renombrado/eliminado del JSON desde que se guardó el ajuste) se
+    registra como warning y se saltea, no interrumpe el resto.
+
+    Nota: esto arregla que el proceso vuelva a LEER la tabla al arrancar
+    — no garantiza que el archivo SQLite en sí sobreviva el restart. Eso
+    depende de que SESSION_DB_PATH apunte a disco realmente persistente
+    en el entorno de deploy (no verificado acá contra la config real de
+    Render); si el filesystem es efímero, la tabla puede estar vacía en
+    cada arranque y no hay nada que reaplicar.
+    """
+    _ensure_loaded()
+    for spot_key, params in ajustes.items():
+        for param, valor in params.items():
+            try:
+                actualizar_ajuste(spot_key, param, valor)
+            except (KeyError, ValueError) as e:
+                logger.warning(
+                    "No se pudo reaplicar ajuste persistido %s.%s=%s: %s",
+                    spot_key, param, valor, e,
+                )

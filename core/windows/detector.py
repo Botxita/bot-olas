@@ -19,7 +19,7 @@ from typing import List
 
 from ..scoring.engine import calcular_score, _tipo_viento, ajustar_swell
 from ..scoring.models import ForecastHour, ScoreBreakdown, SpotConfig, VentanaOptima
-from ..analysis.daylight import get_daylight_for_forecast_hour, is_daylight
+from ..analysis.daylight import get_daylight_for_forecast_hour, is_daylight, PolarDaylightError
 
 logger = logging.getLogger(__name__)
 
@@ -92,14 +92,24 @@ def detectar_ventanas(
     if not forecast:
         return []
 
-    # Filtrar horas nocturnas: solo evaluar horas dentro del horario diurno
+    # Filtrar horas nocturnas: solo evaluar horas dentro del horario diurno.
+    # Solo PolarDaylightError (el caso documentado, un tipo específico —
+    # no ValueError genérico) activa el fail-safe de incluir la hora igual.
+    # Antes, except Exception amplio atrapaba (y escondía, fail-open)
+    # cualquier otro error no relacionado (ej. un bug futuro en
+    # daylight.py, o un SpotConfig con lat/lon corruptos) tratándolo
+    # silenciosamente como si fuera el caso polar. Angostar a `ValueError`
+    # a secas no alcanza — cualquier otro ValueError no documentado
+    # (ej. de is_daylight() con un dt naive, o un bug futuro) seguiría
+    # cayendo en el fail-safe; PolarDaylightError es una subclase
+    # específica de ValueError solo para el fenómeno polar (#29).
     forecast_diurno = []
     for hour in forecast:
         try:
             daylight = get_daylight_for_forecast_hour(spot, hour.timestamp)
             if is_daylight(hour.timestamp, daylight):
                 forecast_diurno.append(hour)
-        except Exception as e:
+        except PolarDaylightError as e:
             logger.warning("Error calculando luz solar para %s: %s", hour.timestamp, e)
             # En caso de error, incluir la hora (fail-safe)
             forecast_diurno.append(hour)

@@ -1107,6 +1107,54 @@ class TestDetectorVentanas(unittest.TestCase):
         self.assertIsNotNone(hour)
         self.assertIsNotNone(bd)
 
+    def test_daylight_polar_error_incluye_la_hora_fail_safe(self):
+        """
+        El fail-safe se conserva para el caso documentado: PolarDaylightError
+        de get_daylight_for_forecast_hour() (fenómeno polar) sigue
+        incluyendo la hora igual, en vez de descartarla.
+        """
+        from core.analysis.daylight import PolarDaylightError
+
+        spot = make_spot()
+        ahora = datetime.now(timezone.utc)
+        ts = (ahora + timedelta(days=1)).replace(hour=15, minute=0, second=0, microsecond=0)
+        cond = dict(altura=1.4, periodo=14, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0)
+        forecast = [make_hour(ts=ts, **cond), make_hour(ts=ts + timedelta(hours=1), **cond)]
+
+        with patch(
+            "core.windows.detector.get_daylight_for_forecast_hour",
+            side_effect=PolarDaylightError("polar simulado"),
+        ):
+            ventanas = detectar_ventanas(forecast, spot, umbral=0.60)
+
+        self.assertEqual(len(ventanas), 1, f"Esperaba 1 ventana (fail-safe polar): {ventanas}")
+
+    def test_daylight_excepcion_no_polar_se_propaga(self):
+        """
+        Regresión #29: un error NO relacionado al fenómeno polar (ej. un
+        bug futuro en daylight.py, o un SpotConfig con lat/lon corruptos)
+        no debe esconderse tratándolo como el fail-safe polar — antes,
+        except Exception amplio lo atrapaba igual e incluía la hora en
+        silencio; ahora debe propagarse. Cubre tanto un error sin relación
+        (RuntimeError) como un ValueError genérico que NO sea
+        PolarDaylightError — angostar de Exception a ValueError a secas no
+        alcanzaba, porque cualquier ValueError no documentado también
+        caería en el fail-safe.
+        """
+        spot = make_spot()
+        ahora = datetime.now(timezone.utc)
+        ts = (ahora + timedelta(days=1)).replace(hour=15, minute=0, second=0, microsecond=0)
+        forecast = [make_hour(ts=ts)]
+
+        for excepcion in (RuntimeError("bug no relacionado simulado"), ValueError("value error generico simulado")):
+            with self.subTest(excepcion=type(excepcion).__name__):
+                with patch(
+                    "core.windows.detector.get_daylight_for_forecast_hour",
+                    side_effect=excepcion,
+                ):
+                    with self.assertRaises(type(excepcion)):
+                        detectar_ventanas(forecast, spot, umbral=0.60)
+
     def test_todas_las_horas_fallan_score_lanza_excepcion(self):
         """
         Regresión #23: si calcular_score() falla para TODAS las horas

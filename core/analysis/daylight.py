@@ -23,6 +23,22 @@ from zoneinfo import ZoneInfo
 from core.scoring.models import SpotConfig
 
 
+class PolarDaylightError(ValueError):
+    """
+    El sol no sale o no se pone ese día en esa latitud (fenómeno polar).
+
+    Subclase de ValueError (no un Exception nuevo sin relación) para que
+    el código existente que ya captura `except ValueError` sobre
+    get_daylight() (ej. core/analysis/best_hour.py) siga funcionando sin
+    cambios. Es un tipo específico para que los callers puedan distinguir
+    este caso documentado de cualquier OTRO ValueError que un bug futuro
+    en este módulo pudiera lanzar por una razón distinta — capturar
+    `except ValueError` a secas como fail-safe "sabemos que es el caso
+    polar" era una suposición no garantizada por el tipo (#29).
+    """
+    pass
+
+
 @dataclass
 class DaylightInfo:
     """Información de luz solar para un día y spot específico."""
@@ -61,7 +77,8 @@ def get_daylight(spot: SpotConfig, fecha: date) -> DaylightInfo:
         DaylightInfo con sunrise/sunset en UTC y en tz local del spot.
 
     Raises:
-        ValueError: Si el sol no sale o no se pone ese día (latitudes extremas).
+        PolarDaylightError: Si el sol no sale o no se pone ese día
+            (latitudes extremas). Subclase de ValueError.
     """
     tz = spot.get_zoneinfo()
 
@@ -189,7 +206,7 @@ def _calcular_sol(lat: float, lon: float, fecha: date):
 
     # cos_ha fuera de [-1, 1] indica sol de medianoche o noche polar
     if cos_ha < -1 or cos_ha > 1:
-        raise ValueError(
+        raise PolarDaylightError(
             f"Sol no sale/no se pone en lat={lat} el {fecha} "
             f"(cos_ha={cos_ha:.3f}). Fenómeno polar."
         )

@@ -142,10 +142,20 @@ def detectar_ventanas(
 
     for hour, bd in scored:
         if bd.score_total >= umbral:
-            # Cortar si el día local cambió respecto a la hora anterior en la ventana
+            # Cortar si la hora no es exactamente contigua a la anterior de
+            # la ventana (hueco real de datos — hora faltante del proveedor,
+            # u hora descartada por #23 — entre dos horas buenas del mismo
+            # día, antes las fusionaba en una sola ventana continua, #25) O
+            # si cambió el día local (regla de producto ya existente, evita
+            # ventanas que cruzan medianoche aunque sean horariamente
+            # contiguas — ej. 23:00→00:00). Son dos reglas distintas, no
+            # una reemplaza a la otra: dos horas de días distintos SIEMPRE
+            # cortan, aunque estén separadas por exactamente 1h.
             if current_window:
                 ultimo_ts = current_window[-1][0].timestamp
-                if hour.timestamp.astimezone(tz).date() != ultimo_ts.astimezone(tz).date():
+                hay_hueco = hour.timestamp - ultimo_ts != timedelta(hours=1)
+                cambia_dia = hour.timestamp.astimezone(tz).date() != ultimo_ts.astimezone(tz).date()
+                if hay_hueco or cambia_dia:
                     ventanas_raw.append(current_window)
                     current_window = []
             current_window.append((hour, bd))

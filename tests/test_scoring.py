@@ -1092,6 +1092,94 @@ class TestDetectorVentanas(unittest.TestCase):
                 f"La hora que sí calculó score ({ts_ok}) debería formar una ventana: {ventanas}",
             )
 
+    def test_hueco_de_datos_corta_la_ventana(self):
+        """
+        Regresión #25: dos bloques de horas buenas (sobre el umbral) del
+        MISMO día local, separados por un hueco real de datos del proveedor
+        (una hora intermedia directamente ausente del forecast, no solo con
+        score bajo), deben quedar como DOS ventanas separadas — antes, el
+        corte solo chequeaba cambio de día local, así que un hueco dentro
+        del mismo día no se detectaba y ambos bloques se fusionaban en una
+        sola ventana continua.
+        """
+        class _RelojFijo(datetime):
+            _ahora = None
+
+            @classmethod
+            def now(cls, tz=None):
+                return cls._ahora.astimezone(tz) if tz else cls._ahora
+
+        tz = ZoneInfo("America/Argentina/Buenos_Aires")
+        _RelojFijo._ahora = datetime(2025, 1, 15, 6, 0, tzinfo=tz).astimezone(timezone.utc)
+
+        spot = make_spot()
+        cond_buena = dict(altura=1.4, periodo=14, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0)
+        ts_08 = datetime(2025, 1, 15, 8, 0, tzinfo=tz).astimezone(timezone.utc)
+        ts_09 = ts_08 + timedelta(hours=1)
+        # 10:00 deliberadamente ausente del forecast -- simula un hueco real del proveedor.
+        ts_11 = ts_08 + timedelta(hours=3)
+        ts_12 = ts_08 + timedelta(hours=4)
+        forecast = [
+            make_hour(ts=ts_08, **cond_buena),
+            make_hour(ts=ts_09, **cond_buena),
+            make_hour(ts=ts_11, **cond_buena),
+            make_hour(ts=ts_12, **cond_buena),
+        ]
+
+        with patch("core.windows.detector.datetime", _RelojFijo):
+            ventanas = detectar_ventanas(forecast, spot, umbral=0.60)
+
+        self.assertEqual(len(ventanas), 2, f"Esperaba 2 ventanas separadas por el hueco: {ventanas}")
+        inicios = sorted(v.inicio for v in ventanas)
+        self.assertEqual(inicios, [ts_08, ts_11])
+        for v in ventanas:
+            self.assertEqual(v.horas_count, 2)
+
+    def test_medianoche_corta_la_ventana_aunque_sea_horariamente_contigua(self):
+        """
+        No-regresión pedida por Codex al revisar #25: el corte de ventana al
+        cambiar el día local debe conservarse — horas horariamente contiguas
+        que cruzan medianoche (22:00→23:00→00:00→01:00, cada una separada
+        por exactamente 1h, sin ningún hueco) NO deben fusionarse en una
+        sola ventana. Se fuerza is_daylight=True porque en la práctica
+        ningún spot real tiene luz solar a esa hora — el filtro de luz
+        diurna ya evita el escenario en producción, pero la regla en sí
+        (nunca cruzar medianoche) debe seguir vigente en el código, no
+        depender solo de ese filtro externo.
+        """
+        class _RelojFijo(datetime):
+            _ahora = None
+
+            @classmethod
+            def now(cls, tz=None):
+                return cls._ahora.astimezone(tz) if tz else cls._ahora
+
+        tz = ZoneInfo("America/Argentina/Buenos_Aires")
+        _RelojFijo._ahora = datetime(2025, 1, 15, 20, 0, tzinfo=tz).astimezone(timezone.utc)
+
+        spot = make_spot()
+        cond_buena = dict(altura=1.4, periodo=14, dir_swell=95, vel_viento=8, dir_viento=275, nivel_marea=1.0)
+        ts_22 = datetime(2025, 1, 15, 22, 0, tzinfo=tz).astimezone(timezone.utc)
+        ts_23 = ts_22 + timedelta(hours=1)
+        ts_00 = ts_22 + timedelta(hours=2)  # 2025-01-16 00:00 local
+        ts_01 = ts_22 + timedelta(hours=3)
+        forecast = [
+            make_hour(ts=ts_22, **cond_buena),
+            make_hour(ts=ts_23, **cond_buena),
+            make_hour(ts=ts_00, **cond_buena),
+            make_hour(ts=ts_01, **cond_buena),
+        ]
+
+        with patch("core.windows.detector.datetime", _RelojFijo), \
+                patch("core.windows.detector.is_daylight", return_value=True):
+            ventanas = detectar_ventanas(forecast, spot, umbral=0.60)
+
+        self.assertEqual(len(ventanas), 2, f"Esperaba 2 ventanas separadas por el cambio de día: {ventanas}")
+        inicios = sorted(v.inicio for v in ventanas)
+        self.assertEqual(inicios, [ts_22, ts_00])
+        for v in ventanas:
+            self.assertEqual(v.horas_count, 2)
+
     def test_ventana_en_curso_recorta_horas_ya_pasadas(self):
         """
         Regresión #24: una ventana que ya empezó pero todavía no terminó

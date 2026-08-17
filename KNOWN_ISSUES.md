@@ -2,17 +2,19 @@
 
 Documento vivo de auditoría de fondo sobre `core/` (scoring, analysis, windows) y, desde el hallazgo #32, sobre **calidad de datos geográficos** de `config/spots/*.json`. Generado a partir de una revisión conjunta Claude Code + Codex (auditor independiente, ver `AGENTS.md`).
 
-**Estado (actualizado tras 3 rondas de fixes de código + 1 ronda de auditoría de datos + 2 rondas de fixes de datos):** de los **55 hallazgos documentados** (31 de código + 24 de datos geográficos), **30 fueron corregidos** — 13 de código en 3 grupos priorizados por Ivan, más 17 de datos geográficos:
+**Estado (actualizado tras 3 rondas de fixes de código + 1 ronda de auditoría de datos + 2 rondas de fixes de datos + los subgrupos scoring y Analysis del Grupo 4):** de los **55 hallazgos documentados** (31 de código + 24 de datos geográficos), **42 fueron corregidos** — 25 de código (13 en 3 grupos priorizados por Ivan + 4 del subgrupo scoring del Grupo 4: #2, #6, #7, #8 + 8 del subgrupo Analysis del Grupo 4: #14-#21), más 17 de datos geográficos:
 - **10 verificados por Ivan en Google Maps** (la fuente más confiable): #33, #34, #41, #43, #44, #46, #47, #48, #49, #53.
 - **7 del "grupo confiable"** aplicados a partir de estimaciones de Codex (punto medio de rango sugerido, o coordenada estimada), **sin verificación cartográfica** de Ivan: #32, #37, #38, #39, #40, #50, #51 — tratar con más cautela que los 10 anteriores.
 
-**Los 24 hallazgos geográficos quedan 100% cerrados** (con acción tomada o verificación explícita en cada uno): 17 corregidos (ver arriba) + 6 verificados sin cambios necesarios en sus coordenadas (#36, #35, #42, #45, #52, #55 — de estos, #35/#52/#55 tienen una sospecha de `orientacion_costa_deg` que la verificación de coordenadas NO abordó, sigue marcada `⚠️` en cada uno por separado) + 1 con evidencia insuficiente para decidir (#54, `🔍 VERIFICADO — EVIDENCIA INSUFICIENTE`). Los demás hallazgos de código sin marcar (#2, #6-#8, #14-#21, #25-#29, #31) siguen abiertos, sin tocar todavía.
+**Los 24 hallazgos geográficos quedan 100% cerrados** (con acción tomada o verificación explícita en cada uno): 17 corregidos (ver arriba) + 6 verificados sin cambios necesarios en sus coordenadas (#36, #35, #42, #45, #52, #55 — de estos, #35/#52/#55 tienen una sospecha de `orientacion_costa_deg` que la verificación de coordenadas NO abordó, sigue marcada `⚠️` en cada uno por separado) + 1 con evidencia insuficiente para decidir (#54, `🔍 VERIFICADO — EVIDENCIA INSUFICIENTE`).
+
+**Grupo 4 (hallazgos sin priorizar en la ronda original, sin tag de grupo — cada uno con su propio commit):** subgrupo scoring **#2, #6, #7, #8 ✅ RESUELTO** y subgrupo analysis **#14-#21 ✅ RESUELTO** — ambos subgrupos completos, ver detalle en cada hallazgo abajo. Quedan abiertos, sin tocar: subgrupo windows #25-#29, y #31 (registry+persistencia).
 
 - **Grupo 1** (`fix-grupo1-scoring-critico`): #5, #12, #22.
 - **Grupo 2** (`fix-grupo2-analisis-y-detector`): #1, #3, #4, #11, #23, #24.
 - **Grupo 3** (`fix-grupo3-riesgos-configuracion`): #9, #10, #13, #30.
 
-Cada fix pasó por revisión obligatoria de Codex antes de commitear (ver `AGENTS.md`) y sumó tests de regresión — el test suite completo sigue en 217 passed / 15 failed (los 15 son fixtures de fecha fija preexistentes, no relacionados a este documento).
+Cada fix pasó por revisión obligatoria de Codex antes de commitear (ver `AGENTS.md`) y sumó tests de regresión — el test suite completo sigue en 252 passed / 15 failed (los 15 son fixtures de fecha fija preexistentes, no relacionados a este documento).
 
 Formato por hallazgo (#1-#31, código): módulo, severidad, líneas, descripción, escenario concreto, por qué el test suite no lo agarra. Formato por hallazgo (#32-#55, datos geográficos): spot afectado, qué está mal, estimación de corrección — ver la sección propia para su escala de severidad, distinta a la de código.
 
@@ -35,6 +37,8 @@ Auditado completo (355 líneas) contra `models.py`, `config/scoring_weights.json
 - **Cobertura:** no cubierta. `make_spot()` en los tests fija siempre `mid_better`; ningún test compara `low_better` vs `high_better`.
 
 ### 2. Salto inverso al cruzar el límite de marea (`marea_min`/`marea_max`) — **alta**
+
+**✅ RESUELTO** — commit `323fb2b` (`fix(#2): score de marea continuo al cruzar el límite exacto del rango`).
 
 - Código: [engine.py:196-207](core/scoring/engine.py#L196).
 - Justo en el límite (`nivel == marea_min` o `== marea_max`) la rama "dentro del rango" da `0.80`. Un valor infinitesimalmente afuera entra en la otra fórmula y da casi `1.00`.
@@ -69,6 +73,8 @@ Auditado completo (355 líneas) contra `models.py`, `config/scoring_weights.json
 
 ### 6. Discontinuidad al cruzar `2.5 × tolerancia` en score de dirección — **media**
 
+**✅ RESUELTO** — commit `eec3eea` (`fix(#6): fusionar ramas de score de dirección en una curva continua`).
+
 - Código: [engine.py:107-119](core/scoring/engine.py#L107-119).
 - Con tolerancia 45° (rango real de tolerancias: 30°-60°): `diff=112.5°` (exactamente `2.5×tolerancia`) → `0.20`. `diff=112.500001°` → `max(0.05, 0.20-0.003×112.5)` = `0.05`. Un cambio infinitesimal en la dirección del swell hace caer el componente 0.15 de golpe.
 - Como todas las tolerancias reales son ≥30°, la tercera rama (`else`) entra directamente en el piso `0.05` para casi cualquier diff que la alcance — el decaimiento gradual pensado en el diseño no se nota en la práctica actual.
@@ -76,11 +82,15 @@ Auditado completo (355 líneas) contra `models.py`, `config/scoring_weights.json
 
 ### 7. Penalización fuera del rango de marea usa metros absolutos, no relativos — **media**
 
+**✅ RESUELTO** — commit `ccad6e5` (`fix(#7): penalización de marea fuera de rango relativa a la amplitud del spot`).
+
 - Código: [engine.py:196-207](core/scoring/engine.py#L196). Dentro del rango, la distancia al centro se normaliza por `amplitud` propia del spot. Afuera, la penalización es `0.50 × desvío_en_metros` sin relación a esa amplitud.
 - Ejemplo con desvío de 0.2m: en un spot con rango `0.2–0.8` (amplitud angosta), 0.2m equivale al 67% de su semiamplitud. En un spot con rango `0.5–2.0` (amplitud ancha), 0.2m es solo 27% de su semiamplitud. Ambos reciben exactamente `0.90` — el significado relativo del rango configurado desaparece apenas se cruza el límite.
 - **Cobertura:** no cubierta. Los tests usan un único rango de marea (`0.4–1.6`), nunca comparan spots con amplitudes distintas.
 
 ### 8. Ráfagas de viento (`rafaga_kmh`) completamente ignoradas — **media**
+
+**✅ RESUELTO** — commit `8864b3d` (`fix(#8): aplicar penalizacion de rafagas de viento en el score`). Nueva `_factor_rafaga()`; `_generar_flags()` agrega el flag "Ráfagas fuertes" independiente del flag de tipo de viento (hallazgo de Codex durante la revisión: el score bajaba pero el flag seguía siendo solo positivo).
 
 - `WindData.rafaga_kmh` existe en [models.py:21-26](core/scoring/models.py#L21) pero `_score_viento()` ([engine.py:149-173](core/scoring/engine.py#L149)) solo lee `velocidad_kmh` y dirección.
 - Ejemplo: viento sostenido 3 km/h con ráfaga 5 km/h → score `1.00`. Viento sostenido 3 km/h con ráfaga 100 km/h → también `1.00`, aunque ese segundo escenario sería impracticable o peligroso.
@@ -137,17 +147,23 @@ Auditado contra `tests/test_tides.py`, `tests/test_daylight.py`, `tests/test_bes
 
 ### 14. `detectar_mareas_del_dia()` pierde extremos exactamente en los bordes del día — **media**
 
+**✅ RESUELTO** — commit `a9b95d4` (`fix(#14): detectar extremos de marea en los bordes del dia`). Re-detecta con 2 horas de contexto real a cada lado (si existen) y filtra los eventos resultantes de vuelta a la fecha pedida.
+
 - Recorte previo por fecha: [tides.py:155-169](core/analysis/tides.py#L155). El detector de extremos ignora el primer y último índice de la serie que recibe ([tides.py:188-220](core/analysis/tides.py#L188)).
 - Ejemplo: 23:00 del día anterior = 0.9m, 00:00 del día pedido = 1.1m, 01:00 = 0.9m. Las 00:00 es una pleamar local clara, pero al recortarse el array por fecha queda en el índice 0 de la serie filtrada y nunca se evalúa como extremo.
 - **Cobertura:** no cubierta. El test diario solo verifica que los eventos devueltos pertenezcan a la fecha correcta, no que se detecten extremos cercanos a medianoche.
 
 ### 15. Mesetas de 2+ horas en pleamar/bajamar no generan evento — **media**
 
+**✅ RESUELTO** — commit `8e846bf` (`fix(#15): detectar mesetas de 2+ horas en pleamar/bajamar`). `_detectar_extremos()` agrupa corridas de valores suavizados idénticos y compara la meseta contra sus vecinos reales fuera de ella.
+
 - Código: comparaciones estrictas `curr > prev and curr > next` en [tides.py:200-218](core/analysis/tides.py#L200).
 - Ejemplo (serie suavizada): `0.50, 0.80, 0.80, 0.50` — ninguno de los dos `0.80` es estrictamente mayor que ambos vecinos, así que la pleamar de 2 horas no se detecta.
 - **Cobertura:** no cubierta. Hay tests con serie plana y con senoidales suaves, pero ninguno con una meseta corta en un extremo.
 
 ### 16. `tiene_datos=False` confunde 4 estados distintos — **media**
+
+**✅ RESUELTO** — commit `952b808` (`fix(#16): distinguir motivos detras de tiene_datos=False`). Nueva `calcular_mejor_hora_detallado()` retorna `(resultado, motivo)` con 4 constantes (`MOTIVO_SIN_FORECAST`, `MOTIVO_SOLO_NOCTURNO_O_PASADO`, `MOTIVO_FALLO_SOLAR`, `MOTIVO_SCORING_FALLO`); `DayScore` gana `motivo_sin_datos`. Si TODOS los días de la semana fallan por un motivo técnico real, `analizar_semana()` propaga `RuntimeError` en vez de devolver `None` mudo (mismo criterio que #23).
 
 - `calcular_mejor_hora()` absorbe cualquier error de scoring silenciosamente ([best_hour.py:85-95](core/analysis/best_hour.py#L85)); `weekly.py` convierte cualquier resultado `None` en "sin datos" ([weekly.py:142-154](core/analysis/weekly.py#L142)).
 - Se pierden la distinción entre: no hay forecast para el día / solo hay forecast nocturno / falló el cálculo solar (excepción polar) / el scoring falló para todas las horas del día.
@@ -156,11 +172,15 @@ Auditado contra `tests/test_tides.py`, `tests/test_daylight.py`, `tests/test_bes
 
 ### 17. `nivel_actual` no respeta el filtro `desde` — **media**
 
+**✅ RESUELTO** — commit `c69381a` (`fix(#17): nivel_actual respeta el filtro desde`). `nivel_actual` ahora toma el primer nivel cuyo timestamp sea `>= desde`; si ninguno lo es, queda en `None`.
+
 - Código: [tides.py:113-127](core/analysis/tides.py#L113). `niveles[0]` toma el primer elemento de todo `forecast`, no el primero relevante después de aplicar `desde`.
 - Ejemplo: forecast 08:00=0.4m, 09:00=0.6m, 10:00=0.8m, con `desde=10:00`. `nivel_actual` queda en 0.4m aunque el único período relevante para el caller empieza en 0.8m. Inconsistente además con `_calcular_tendencia()`, que sí busca el índice más cercano al reloj real.
 - **Cobertura:** no cubierta. El test de `desde` solo inspecciona timestamps de eventos, nunca `nivel_actual`.
 
 ### 18. `tiene_extremos_claros` mezcla eventos filtrados con amplitud histórica sin filtrar — **media**
+
+**✅ RESUELTO** — commit `98996b6` (`fix(#18): tiene_extremos_claros usa amplitud filtrada por desde`). Re-suaviza la sub-serie ya recortada desde `desde` (no un slice de la ya suavizada, que seguía contaminada por el último valor anterior al corte — la media móvil es centrada).
 
 - Filtrado de eventos por `desde`: [tides.py:106-111](core/analysis/tides.py#L106). Cálculo de amplitud (para decidir "claros"): [tides.py:118-121](core/analysis/tides.py#L118) — sobre la serie **completa**, sin aplicar `desde`.
 - Ejemplo: pasado con niveles entre 0.2m y 1.4m (amplitud 1.2m, sobre el umbral 0.05), futuro desde el corte casi plano (0.50, 0.51, 0.50, con un micro-extremo de 1cm). El evento futuro sobrevive al filtro `desde`, la amplitud histórica infla el resultado, y `tiene_extremos_claros=True` aunque el extremo real disponible no sea claro en absoluto.
@@ -168,17 +188,23 @@ Auditado contra `tests/test_tides.py`, `tests/test_daylight.py`, `tests/test_bes
 
 ### 19. Caché de daylight puede devolver datos de otro spot con la misma `key` — **media**
 
+**✅ RESUELTO** — commit `96fcaae` (`fix(#19): incluir lat/lon/tz en la clave del cache de daylight`). `cache_key` pasa a ser `(spot.key, spot.lat, spot.lon, spot.tz, fecha)`. Revisado aislado, a pedido explícito de Ivan.
+
 - Código: [daylight.py:97-112](core/analysis/daylight.py#L97). El caché usa solo `(spot.key, fecha)` como clave — no incluye lat/lon/tz — y es un dict mutable con default de argumento (vive toda la vida del proceso).
 - Ejemplo: si se recarga/edita un spot conservando la misma `key` pero con coordenadas distintas (ej. corrección de lat/lon en `config/spots/*.json` seguida de un redeploy sin reinicio limpio del proceso, o dos spots distintos compartiendo `key` por error de config), el amanecer/atardecer cacheado con las coordenadas viejas se sigue devolviendo para esa fecha.
 - **Cobertura:** parcial. Hay test de reutilización para mismo spot/día y de separación por fecha, pero no de misma `key` con coordenadas o tz distintas.
 
 ### 20. `mejor_ventana_semana` desempata usando el score redondeado a entero — **baja**
 
+**✅ RESUELTO** — commit `040f9a0` (`fix(#20): mejor_ventana_semana desempata con score real, no redondeado`). Usa `breakdown.score_total` (float) en vez de `score_100`.
+
 - Código: [weekly.py:60-67](core/analysis/weekly.py#L60). La selección usa `BestHourResult.score_100` (entero redondeado) en vez de `breakdown.score_total` (float).
 - Ejemplo: Lunes `score_total=0.8041` → `score_100=80`; Martes `score_total=0.8049` → `score_100=80`. Empatan en `max()` y gana el primero (Lunes) aunque Martes tenga el score real más alto.
 - **Cobertura:** no cubierta. El test también compara solo `score_100`, aceptando el mismo empate artificial que el código produce.
 
 ### 21. `es_mejor` se asigna por comparación de timestamp, no de identidad — **baja**
+
+**✅ RESUELTO** — commit `2e9529d` (`fix(#21): es_mejor compara por rank, no por timestamp`). Compara `r.rank == 1 and r.es_dia` — `rank` ya es único por construcción en `calcular_ranking_dia()`.
 
 - Código: [hourly_view.py:79-97](core/analysis/hourly_view.py#L79). `r.hour.timestamp == mejor_rank1.hour.timestamp` en vez de comparar por rank o identidad del objeto.
 - Si el forecast trajera dos registros con el mismo timestamp (duplicado de datos, ej. por un bug de merge de proveedor), ambos quedarían marcados `es_mejor=True` aunque tuvieran rank/score distintos.
@@ -478,4 +504,4 @@ Esta lista refleja la priorización sugerida en la auditoría original, antes de
 
 **Crash confirmado (no solo silencioso)**: ranking con solo horas nocturnas + `incluir_noche=True` (#12) — ✅ resuelto, `ddc69e6`.
 
-**Sin priorizar en la ronda original, todavía abiertos**: #6, #7, #8, #14, #15, #16, #17, #18, #19, #20, #21, #25, #26, #27, #28, #29, y #31 (hallado después, durante la revisión del fix #13).
+**Sin priorizar en la ronda original — subgrupos scoring (#2, #6, #7, #8) y analysis (#14-#21) ✅ RESUELTO, ver detalle en cada hallazgo arriba.** Todavía abiertos: #25, #26, #27, #28, #29 (subgrupo windows), y #31 (registry+persistencia, hallado después, durante la revisión del fix #13).

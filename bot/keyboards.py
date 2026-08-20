@@ -106,7 +106,7 @@ def kb_seleccion_spot(
     region_key: str,
     spots: List[Tuple[str, dict]],
 ) -> InlineKeyboardMarkup:
-    BREAK_ICONS = {"reef": "🪸", "point": "↪️", "beach": "🏖️"}
+    BREAK_ICONS = {"reef": "🪸", "point": "🌀", "beach": "🏖️"}
     botones = []
     for key, info in spots:
         icon = BREAK_ICONS.get(info.get("tipo_break", "beach"), "🏄")

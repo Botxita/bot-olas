@@ -16,7 +16,7 @@
           "viento": {"vel_max_offshore_kmh": 25, "vel_max_onshore_kmh": 10},
           "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
           "fuente_datos": "open-meteo",
-          "notas": "Point break derecho largo y manso sobre canto rodado, hasta 200-500m de recorrido. Ideal para longboard e intermedios. Coordenadas OpenStreetMap; orientación derivada de swell ideal SSW + offshore NNE (surf-forecast.com). Calibración numérica (tolerancia, altura, período, viento, marea) reutilizada de Pavones (Costa Rica, point/roca, mismo régimen de swell SW centroamericano) por decisión explícita de Ivan, pese a que Pavones es una ola de mayor tamaño típico — sin verificación cartográfica adicional.",
+          "notas": "Point break derecho largo y manso sobre canto rodado, hasta 200-500m de recorrido. Ideal para longboard e intermedios.",
           "tz": "America/El_Salvador"
         },
         "el_tunco": {
@@ -30,7 +30,7 @@
           "viento": {"vel_max_offshore_kmh": 20, "vel_max_onshore_kmh": 18},
           "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
           "fuente_datos": "open-meteo",
-          "notas": "Beach break frente al pueblo, izquierdas y derechas, hueco y rápido, rompe más cerca de la orilla que El Sunzal (15 min caminando). Accesible para todos los niveles. Coordenadas OpenStreetMap; orientación derivada de swell ideal SW + offshore NE (surf-forecast.com/surfatlas), distinta de El Sunzal pese a compartir playa. Calibración numérica reutilizada de Jacó (Costa Rica, beach/arena, mismo régimen, perfil similar de accesibilidad) por decisión explícita de Ivan.",
+          "notas": "Beach break frente al pueblo, izquierdas y derechas, hueco y rápido, rompe más cerca de la orilla que El Sunzal (15 min caminando). Accesible para todos los niveles.",
           "tz": "America/El_Salvador"
         }
       }

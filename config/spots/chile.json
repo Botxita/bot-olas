@@ -49,7 +49,7 @@
           "viento": {"vel_max_offshore_kmh": 30, "vel_max_onshore_kmh": 10},
           "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
           "fuente_datos": "open-meteo",
-          "notas": "Reef/beach break frente a la ciudad de Iquique, izquierdas y derechas. Mejor en marea baja. Coordenadas OpenStreetMap; orientación derivada de swell ideal W + offshore E (fuentes: surf-forecast, stormrider). altura_min/max, periodo_min_s, marea (rango numérico) y viento confirmados explícitamente por Ivan como reutilización de Las Machas (Arica, mismo tipo de ola); tolerancia_swell_deg confirmada por Ivan como reutilización de El Gringo (Arica, mismo fondo roca/reef) — sin verificación cartográfica adicional para ninguno de estos valores.",
+          "notas": "Reef/beach break frente a la ciudad de Iquique, izquierdas y derechas. Mejor en marea baja.",
           "tz": "America/Santiago"
         }
       }

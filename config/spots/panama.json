@@ -16,7 +16,7 @@
           "viento": {"vel_max_offshore_kmh": 25, "vel_max_onshore_kmh": 10},
           "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
           "fuente_datos": "open-meteo",
-          "notas": "La Punta: point break derecho de clase mundial sobre reef rocoso volcánico, con izquierdas ocasionales en días grandes — dirección exacta de ruptura no resuelta del todo entre fuentes, no afecta el scoring. Temporada alta mayo-octubre. Coordenadas OpenStreetMap (poblado, ancla más cercana a La Punta específica); orientación derivada de swell ideal SSW + offshore N (surf-forecast.com/tourismpanama). Calibración numérica reutilizada de Pavones (Costa Rica, point/roca, mismo régimen de swell SW centroamericano y magnitud de ola similar) por decisión explícita de Ivan — sin verificación cartográfica adicional.",
+          "notas": "La Punta: point break derecho de clase mundial sobre reef rocoso volcánico, con izquierdas ocasionales en días grandes. Temporada alta mayo-octubre.",
           "tz": "America/Panama"
         }
       }

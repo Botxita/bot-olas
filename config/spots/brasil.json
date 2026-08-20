@@ -194,7 +194,7 @@
           "viento": {"vel_max_offshore_kmh": 25, "vel_max_onshore_kmh": 15},
           "ajustes_locales": {"delta_altura": 0.0, "factor_periodo": 1.0},
           "fuente_datos": "open-meteo",
-          "notas": "Playa principal de surf en Itacaré, olas rápidas y huecas sobre banco de arena, rocas en los extremos. Temporada abril-septiembre. Coordenadas OpenStreetMap; orientación derivada de swell ideal E/SE + offshore WNW (surf-forecast.com — una fuente contradictoria que citaba offshore E fue descartada por Ivan, probablemente describe Itacarezinho/Engenhoca, spots distintos del mismo corredor). tolerancia_swell_deg, altura, periodo_min_s, marea (rango numérico y tipo_efecto) y viento confirmados explícitamente por Ivan como reutilización del cluster de Rio Grande do Norte (Pipa/Praia do Madeiro/Baía Formosa, beach breaks brasileños de perfil climático similar ya calibrados) — sin verificación cartográfica adicional para ninguno de estos valores.",
+          "notas": "Playa principal de surf en Itacaré, olas rápidas y huecas sobre banco de arena, rocas en los extremos. Temporada abril-septiembre.",
           "tz": "America/Bahia"
         }
       }

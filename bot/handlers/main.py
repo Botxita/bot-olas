@@ -869,8 +869,20 @@ def _cb_nivel(query, user_id: int, nivel: str):
     # revisión de Codex). "menu_spot" también cubre estar en cualquier
     # pantalla de resultado del spot (Ahora/Ventanas/etc. no cambian
     # step), que es el caso que sí queremos preservar.
+    #
+    # Además: solo aplica si el usuario YA tenía un nivel guardado antes
+    # de este callback, es decir, es un cambio real vía /nivel. En el
+    # onboarding de primera vez (todavía sin nivel) spot_key puede seguir
+    # colgado de una sesión vieja de antes de tener cuenta — sin este
+    # chequeo, un usuario nuevo terminaba tirado directo en un spot ajeno
+    # en vez de ver el menú principal la primera vez que abre el bot.
+    ya_tenia_nivel = session_store.tiene_nivel(user_id)
     estado = session_store.get_session(user_id)
-    spot_key_previo = estado.get("spot_key") if estado.get("step") == "menu_spot" else None
+    spot_key_previo = (
+        estado.get("spot_key")
+        if ya_tenia_nivel and estado.get("step") == "menu_spot"
+        else None
+    )
 
     session_store.set_nivel(user_id, nivel)
 

@@ -82,6 +82,10 @@ def main():
             port=port,
             url_path=token,
             webhook_url=f"{webhook_url}/{token}",
+            # Explícito: si se omite, Telegram conserva el allowed_updates
+            # anterior del bot (puede excluir callback_query y dejar los
+            # botones inline sin respuesta).
+            allowed_updates=["message", "callback_query"],
         )
 
         patched = _patch_health(updater)

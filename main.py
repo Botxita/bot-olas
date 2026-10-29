@@ -97,7 +97,7 @@ def main():
         updater.idle()
     else:
         logger.info("Iniciando en modo POLLING (desarrollo local)")
-        updater.start_polling()
+        updater.start_polling(allowed_updates=["message", "callback_query"])
         updater.idle()
 
 
